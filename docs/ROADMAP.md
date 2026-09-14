@@ -168,14 +168,63 @@ Still open for a follow-up deployment iteration:
   similar) via CI, once that is explicitly requested and a registry/
   credential story is defined — out of scope for this milestone by design.
 
+## Milestone 5 — Live validation & OCR benchmark reporting ⚠️ (attempted; blocked on environment)
+
+Attempted on branch `feature/live-validation-benchmarks`. **Blocked on
+environment availability**: no Docker engine and no optional OCR
+dependency/credential (`pytesseract`, `paddleocr`, `VISION_LLM_API_KEY`)
+were present, so this milestone delivered a static audit + offline
+benchmark harness rather than a live one. Full evidence in
+`docs/BENCHMARK_RESULTS.md`.
+
+- ⚠️ **Docker build/run smoke test** — not possible; `docker` CLI is not
+  installed in this environment. Repeated the Milestone 4 static audit
+  (Dockerfile instruction review, `docker-compose.yml` YAML/schema parse)
+  — both still pass — but `/api/health`, log inspection, and bind-mount
+  UID/GID 1000 write-permission verification remain unexercised against a
+  real engine.
+- ✅ **Benchmark tooling exercised end-to-end**: `tools/evaluate_sample.py
+  --engine dummy --json` was run against a synthetic (non-copyrighted,
+  `reportlab`-generated) 5-page PDF, reporting runtime/pages-per-second/
+  character/output-size metrics plus a separately measured ~83 MiB peak
+  RSS baseline (`psutil`). This confirms the CLI/reporting pipeline itself
+  works; it carries no OCR-accuracy signal (the fixture has no scanned
+  Persian text).
+- ⚠️ **Real engine benchmarking** — `tesseract`/`paddle`/`vision_llm` each
+  produced a clean, actionable, nonzero-exit skip (`pytesseract`/
+  `paddleocr` not installed; `VISION_LLM_API_KEY` not set) rather than
+  real recognition metrics. No dependency was installed and no credential
+  was requested/read, per this milestone's scope boundaries.
+- ✅ `docs/BENCHMARK_RESULTS.md` (new) — hardware/software context, exact
+  commands, full JSON output for every engine attempted, observations,
+  limitations, and recommended per-engine production setup/memory sizing.
+
+Still open for a follow-up live-validation iteration:
+
+- **Re-run this entire milestone on a host with a working Docker engine**
+  (Linux host or CI runner preferred) to get the actual `/api/health`
+  probe, log inspection, and bind-mount UID/GID 1000 permission result —
+  this is now the single highest-priority remaining item across the whole
+  roadmap.
+- Install `pytesseract` + system `tesseract-ocr`/`tesseract-ocr-fas` (cheapest
+  real engine) and re-run `tools/evaluate_sample.py --engine tesseract`
+  against a real, licensed (non-copyrighted-content) scanned Persian PDF to
+  get a first real accuracy/runtime data point.
+- Only once a real scanned Persian PDF sample is legitimately available,
+  benchmark `paddle`/`vision_llm` the same way and compare
+  runtime/memory/cost/accuracy trade-offs (see
+  `docs/BENCHMARK_RESULTS.md` recommendations for what to expect from
+  each).
+
 ## Prioritization notes
 
-With Milestones 3 and 4 delivered, the highest-value next steps are: (1)
-building/running the container image against a real Docker engine and
-exercising the healthcheck/volume behavior end-to-end (the remaining open
-item from Milestone 4), and (2) live-validating the real OCR backends and
-Telegram bot polling path against real data/credentials in a controlled
-environment (the remaining open item from Milestones 1 and 3) — everything
-else (converters, job orchestration, delivery surfaces, CI, logging,
-retention, containerization, cleanup scheduling) is already implemented
-and tested end-to-end.
+With Milestones 3 and 4 delivered and Milestone 5 attempted-but-blocked on
+environment availability, the highest-value next step is unchanged from
+before this milestone: **get access to a host with a real Docker engine**
+and re-run both the container smoke test and the real-engine OCR
+benchmarks that could not be exercised here (see Milestone 5 above for the
+detailed follow-up list) — everything else (converters, job orchestration,
+delivery surfaces, CI, logging, retention, containerization, cleanup
+scheduling, benchmark tooling/reporting) is already implemented and tested
+end-to-end.
+
