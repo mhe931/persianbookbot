@@ -90,24 +90,38 @@ in `src/common/models.py` — no subsystem defines a parallel model.
   exceptions to `JobStatus.FAILED`/`RATE_LIMITED` rather than crashing.
 - `telegram_handlers.py`: Telegram chat handlers; `_send_with_retry` retries
   on `RetryAfter`/`TimedOut`/`NetworkError` with backoff.
-- `api.py`: FastAPI app exposing `/api/upload`, `/api/status/{job_id}`,
-  `/api/download/{job_id}/{fmt}`, and mounting the static `web/` frontend at
-  `/`. Rejects oversized uploads by declared size before buffering the full
-  file.
+- `api.py`: FastAPI app exposing `/api/config`, `/api/upload`,
+  `/api/status/{job_id}`, `/api/download/{job_id}/{fmt}`, and mounting the
+  static `web/` frontend at `/`. Rejects oversized uploads by declared size
+  before buffering the full file.
 - `main.py`: process entrypoint — runs the API (and Telegram polling in a
   background thread if `BOT_TOKEN` is set).
 
 ### `web/` — Mini App frontend
 Static vanilla HTML/CSS/JS (`index.html`, `app.js`, `style.css`) that talks
 to the `/api/*` endpoints above; served directly by the FastAPI app.
+Telegram theme-aware (`--tg-theme-*` CSS variables), RTL/Persian, with a
+five-step progress indicator, format-selection toggles, download cards with
+file-size indicators, defensive `window.Telegram.WebApp` lifecycle/
+`MainButton`/haptics integration, and resilient upload/polling with retry.
+
+### `tools/` — operator CLIs
+`evaluate_sample.py`: offline-safe local CLI that runs a single PDF through
+the real `ocr.pipeline.process_pdf` + `converters.*` (engine selectable via
+`--engine dummy|tesseract|paddle|vision_llm`) and reports runtime/page/
+character/output metrics. Never required for `pytest tests/`; the default
+`dummy` engine needs no network/credentials, and other engines fail with an
+actionable message/nonzero exit if their optional dependency or credential
+is missing.
 
 ### `tests/`
-Pytest suite (71 tests) covering rendering/deskew, the OCR abstraction and
+Pytest suite (83 tests) covering rendering/deskew, the OCR abstraction and
 retry/backoff, `PaddleOCREngine`/`VisionLLMOCREngine` mapping and
 error/rate-limit handling (mocked), converters' RTL output, bot config, job
-lifecycle, Telegram handler retry behavior, the Mini App API, and a full
-integration flow — all against generated/dummy fixtures, no real
-PDFs/tokens/network.
+lifecycle, Telegram handler retry behavior, the Mini App API (including
+`/api/config` and static-asset delivery), the `tools/evaluate_sample.py`
+CLI, and a full integration flow — all against generated/dummy fixtures, no
+real PDFs/tokens/network.
 
 ## Design principles
 

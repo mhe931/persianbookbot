@@ -49,6 +49,16 @@ for the full pipeline context and `AGENTS.md` for repo-wide rules.
   `.pdf` filename suffix); reject everything else with a 4xx.
 - `/api/download/{job_id}/{fmt}` must only serve a file once the job's
   `JobStatus` is `DONE` and the output path actually exists on disk.
+- `GET /api/config` exposes `settings.max_file_size_mb` and the valid
+  format set so the Mini App frontend can validate uploads client-side
+  without hardcoding a limit separately from `Settings` — add new
+  frontend-facing config fields here rather than duplicating them in
+  `web/app.js`.
+- `ConversionJob.to_dict()` (`src/common/models.py`) includes a
+  best-effort `output_sizes` dict (bytes per format, once available) for
+  Mini App download-card metadata — keep computing this from the actual
+  files on disk (never trust a stale/cached size) and keep it optional
+  (skip a format whose file is missing/unreadable) rather than raising.
 
 ## Static frontend (`web/`)
 
@@ -58,10 +68,20 @@ for the full pipeline context and `AGENTS.md` for repo-wide rules.
 - Keep the frontend framework-free (vanilla HTML/CSS/JS) unless a roadmap
   milestone (see `docs/ROADMAP.md`) explicitly calls for a framework
   migration.
+- Milestone 2 (`docs/ROADMAP.md`) added Telegram theme CSS variables
+  (`--tg-theme-*`, with light-mode fallbacks), a five-step progress
+  indicator driven by `JobStatus`, format-selection toggles, download
+  cards with file-size indicators, and defensive
+  `window.Telegram.WebApp` (`ready`/`expand`/`MainButton`/haptics)
+  integration in `web/app.js`. Any Telegram WebApp API call must stay
+  wrapped so a plain (non-Telegram) browser never throws.
+- `web/app.js` fetches `GET /api/config` for `max_file_size_mb` but must
+  keep a safe hardcoded fallback (20MB) if that request fails, so the
+  Mini App stays usable even when the backend/network is unavailable.
 
 ## Tests
 
 - New bot/API behavior must be covered with mocked Telegram objects / an
   in-process FastAPI test client — never a real bot token, live Telegram
-  API call, or real network request. Run `pytest tests/` (46 tests as of
+  API call, or real network request. Run `pytest tests/` (83 tests as of
   this writing) before committing.

@@ -1,4 +1,23 @@
-/* Minimal RTL-friendly styling for the Persian Book Bot Mini App. */
+/* RTL-friendly styling for the Persian Book Bot Mini App.
+ *
+ * Uses the CSS custom properties Telegram injects into the WebView
+ * (--tg-theme-*, set by telegram-web-app.js / app.js as a fallback) so the
+ * Mini App matches the user's Telegram theme (light/dark/custom). Every
+ * variable has a light-mode fallback so the page still looks correct when
+ * opened in a plain browser outside Telegram.
+ */
+
+:root {
+  --tg-theme-bg-color: #f5f6f8;
+  --tg-theme-text-color: #1f2430;
+  --tg-theme-hint-color: #707579;
+  --tg-theme-link-color: #2481cc;
+  --tg-theme-button-color: #2b8a3e;
+  --tg-theme-button-text-color: #ffffff;
+  --tg-theme-secondary-bg-color: #ffffff;
+  --tg-theme-section-bg-color: #ffffff;
+  --tg-theme-destructive-text-color: #c92a2a;
+}
 
 * {
   box-sizing: border-box;
@@ -7,8 +26,8 @@
 body {
   margin: 0;
   font-family: "Vazirmatn", "Segoe UI", Tahoma, sans-serif;
-  background: #f5f6f8;
-  color: #1f2430;
+  background: var(--tg-theme-bg-color);
+  color: var(--tg-theme-text-color);
   direction: rtl;
   text-align: right;
 }
@@ -19,20 +38,24 @@ body {
   padding: 24px 16px 48px;
 }
 
+.app-header {
+  margin-bottom: 8px;
+}
+
 h1 {
   font-size: 1.5rem;
   margin-bottom: 4px;
 }
 
 .subtitle {
-  color: #666;
+  color: var(--tg-theme-hint-color);
   margin-top: 0;
   margin-bottom: 24px;
   font-size: 0.9rem;
 }
 
 section {
-  background: #fff;
+  background: var(--tg-theme-section-bg-color, var(--tg-theme-secondary-bg-color));
   border-radius: 12px;
   padding: 16px;
   margin-bottom: 16px;
@@ -41,6 +64,74 @@ section {
 
 .hidden {
   display: none;
+}
+
+/* Five-step progress indicator (Uploaded / Preprocessing / OCR /
+   Generating Documents / Ready). Steps are laid out RTL like the rest of
+   the page; completed/active steps are highlighted with the Telegram
+   button color so the indicator matches the active theme. */
+.steps-section {
+  padding: 16px 8px;
+}
+
+.step-list {
+  display: flex;
+  justify-content: space-between;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  text-align: center;
+  font-size: 0.65rem;
+  color: var(--tg-theme-hint-color);
+}
+
+.step-dot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--tg-theme-bg-color);
+  border: 2px solid var(--tg-theme-hint-color);
+  color: var(--tg-theme-hint-color);
+  font-weight: 700;
+  margin-bottom: 6px;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.step-label small {
+  color: var(--tg-theme-hint-color);
+  font-weight: 400;
+}
+
+.step.is-complete .step-dot {
+  background: var(--tg-theme-button-color);
+  border-color: var(--tg-theme-button-color);
+  color: var(--tg-theme-button-text-color);
+}
+
+.step.is-active .step-dot {
+  border-color: var(--tg-theme-button-color);
+  color: var(--tg-theme-button-color);
+  box-shadow: 0 0 0 3px rgba(43, 138, 62, 0.2);
+}
+
+.step.is-active .step-label,
+.step.is-complete .step-label {
+  color: var(--tg-theme-text-color);
+}
+
+.step.is-error .step-dot {
+  border-color: var(--tg-theme-destructive-text-color);
+  color: var(--tg-theme-destructive-text-color);
 }
 
 .file-label {
@@ -52,14 +143,43 @@ section {
 input[type="file"] {
   display: block;
   width: 100%;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
+}
+
+.file-meta {
+  color: var(--tg-theme-hint-color);
+  font-size: 0.8rem;
+  margin: 0 0 12px;
+  min-height: 1em;
+}
+
+.format-fieldset {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+}
+
+.format-fieldset legend {
+  font-size: 0.8rem;
+  color: var(--tg-theme-hint-color);
+  padding: 0 4px;
+}
+
+.format-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-inline-end: 14px;
+  font-size: 0.9rem;
+  cursor: pointer;
 }
 
 button,
 .download-btn {
   display: inline-block;
-  background: #2b8a3e;
-  color: #fff;
+  background: var(--tg-theme-button-color);
+  color: var(--tg-theme-button-text-color);
   border: none;
   border-radius: 8px;
   padding: 10px 18px;
@@ -86,14 +206,65 @@ button:disabled {
 .progress-fill {
   height: 100%;
   width: 0%;
-  background: #2b8a3e;
+  background: var(--tg-theme-button-color);
   transition: width 0.3s ease;
 }
 
-.download-links {
+.upload-progress-wrap {
   display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.upload-progress-wrap .progress-bar {
+  flex: 1;
+  margin-top: 0;
+}
+
+.progress-text {
+  font-size: 0.8rem;
+  color: var(--tg-theme-hint-color);
+  min-width: 2.5em;
+  text-align: left;
+  direction: ltr;
+}
+
+.download-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.download-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.download-card-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.download-card-format {
+  font-weight: 700;
+}
+
+.download-card-size {
+  font-size: 0.8rem;
+  color: var(--tg-theme-hint-color);
+  direction: ltr;
+  text-align: right;
+}
+
+.download-btn {
+  flex-shrink: 0;
+  padding: 8px 16px;
 }
 
 .error-section {
@@ -101,6 +272,10 @@ button:disabled {
 }
 
 #error-text {
-  color: #c92a2a;
-  margin: 0;
+  color: var(--tg-theme-destructive-text-color);
+  margin: 0 0 10px;
+}
+
+.retry-btn {
+  background: var(--tg-theme-destructive-text-color);
 }

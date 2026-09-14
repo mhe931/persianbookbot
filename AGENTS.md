@@ -33,7 +33,7 @@ $env:PYTHONPATH = "$PWD\src"
 
 (`pyproject.toml` sets `pythonpath = ["src"]` for pytest, so plain
 `pytest tests/` from the repo root also works once the venv is active.)
-As of this writing the suite has **71 passing tests** and requires no
+As of this writing the suite has **83 passing tests** and requires no
 network access, real Telegram token, or real OCR backend — the default
 `DummyOCREngine` is fully deterministic and offline.
 
@@ -51,9 +51,19 @@ network access, real Telegram token, or real OCR backend — the default
 - `src/bot/` — env-driven config (`config.py`), async job orchestration
   (`jobs.py`), Telegram handlers (`telegram_handlers.py`), FastAPI Mini App
   backend (`api.py`), and the process entrypoint (`main.py`).
-- `web/` — static Telegram Mini App frontend (vanilla HTML/CSS/JS).
-- `tests/` — pytest suite covering pipeline, converters, bot/API, and
-  integration, using generated/dummy fixtures only.
+- `web/` — static Telegram Mini App frontend (vanilla HTML/CSS/JS):
+  Telegram theme CSS variables, RTL/Persian typography, a five-step
+  progress indicator, format-selection toggles, download cards with
+  file-size indicators, and defensive `window.Telegram.WebApp`
+  lifecycle/MainButton/haptics integration.
+- `tools/evaluate_sample.py` — offline-safe local CLI that runs a single
+  PDF through the real pipeline/converters (`dummy`/`tesseract`/`paddle`/
+  `vision_llm` engine selection) and reports runtime/page/character/output
+  metrics; never required for `pytest tests/` and never requires network
+  access with the default `dummy` engine.
+- `tests/` — pytest suite covering pipeline, converters, bot/API, the
+  Mini App static assets, the evaluation CLI, and integration, using
+  generated/dummy fixtures only.
 
 ## Git conventions
 
