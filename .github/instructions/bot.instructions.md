@@ -18,6 +18,13 @@ for the full pipeline context and `AGENTS.md` for repo-wide rules.
   (`Settings`/`get_settings()`), sourced from environment variables and an
   optional local `.env` file. Do not read `os.environ` directly elsewhere
   in this package — add new fields to `Settings` instead.
+- Dotenv loading is controlled by `BOT_ENV_FILE` (resolved once at
+  `bot.config` import time): unset loads `.env` as usual, an explicit path
+  loads that file instead, and `""` (empty) disables dotenv loading
+  entirely. `tests/conftest.py` sets `BOT_ENV_FILE=""` before any test
+  imports `bot.config`, so `Settings()`/`get_settings()` in tests never
+  read a real local `.env` — do not remove that guard, and do not add new
+  test code that reads `.env` directly.
 - `bot.jobs.default_job_manager` is a shared singleton `JobManager` used by
   **both** the Telegram handlers and the FastAPI API, so a job started from
   either surface can be polled/downloaded from both. Do not create a second
@@ -27,6 +34,27 @@ for the full pipeline context and `AGENTS.md` for repo-wide rules.
   task: it must catch all exceptions internally and translate them into a
   terminal `JobStatus` (`FAILED` or `RATE_LIMITED`) rather than letting them
   propagate and crash the caller's task/event loop.
+- `JobManager.cleanup_stale_jobs()` prunes finished jobs (`DONE`/`FAILED`/
+  `RATE_LIMITED`) and their upload/output files once older than
+  `settings.job_retention_seconds` (default 24h). It never touches
+  in-flight jobs, and every file-removal failure is caught and recorded in
+  the returned `CleanupResult.errors` list rather than raised — do not let
+  a single bad path abort cleanup of the remaining jobs.
+
+## Logging
+
+- `src/bot/logging_config.py` provides `configure_logging()` (call once at
+  process startup — see `bot.main`), `log_event()`, and `log_duration()`
+  for structured logging with `job_id`/`user_id`/`duration`/`error`
+  context. Prefer these helpers over ad-hoc `logger.info(f"...")` string
+  interpolation when logging job/request lifecycle events.
+- Never pass a `Settings` object, `bot_token`, API key, or any other
+  credential into a logging call — `log_event`/the formatters drop a
+  well-known set of secret-shaped keys as defense in depth, but that is not
+  a substitute for not passing secrets in the first place.
+- `LOG_FORMAT` (`"console"` default or `"json"`) and `LOG_LEVEL` are read
+  from `Settings`; do not hardcode a different logging setup elsewhere in
+  this package.
 
 ## Retry / resilience
 
@@ -54,6 +82,11 @@ for the full pipeline context and `AGENTS.md` for repo-wide rules.
   without hardcoding a limit separately from `Settings` — add new
   frontend-facing config fields here rather than duplicating them in
   `web/app.js`.
+- `GET /api/health` is a lightweight liveness probe: no I/O, no
+  configuration/credential exposure, just `{"status": "ok",
+  "uptime_seconds": ...}`. Keep it dependency-free — do not add DB/OCR
+  engine checks to it without a deliberate reason, since its only job is
+  to answer quickly for uptime checks/load balancers.
 - `ConversionJob.to_dict()` (`src/common/models.py`) includes a
   best-effort `output_sizes` dict (bytes per format, once available) for
   Mini App download-card metadata — keep computing this from the actual
@@ -83,5 +116,10 @@ for the full pipeline context and `AGENTS.md` for repo-wide rules.
 
 - New bot/API behavior must be covered with mocked Telegram objects / an
   in-process FastAPI test client — never a real bot token, live Telegram
-  API call, or real network request. Run `pytest tests/` (83 tests as of
+  API call, or real network request. Run `pytest tests/` (101 tests as of
   this writing) before committing.
+- Tests must stay hermetic against an ambient local `.env` (see the
+  `BOT_ENV_FILE` contract note above) — don't add a test that relies on
+  real dotenv content, and prefer `Settings(...)` kwargs or
+  `monkeypatch.setenv(...)` + `config.reset_settings_cache()` for
+  test-specific configuration.

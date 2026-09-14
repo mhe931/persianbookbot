@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
@@ -23,11 +24,30 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Persian Book Bot API")
 
+# Process start time (monotonic clock) for the health endpoint's uptime
+# figure - set at import time, never touched by requests.
+_process_started_at = time.monotonic()
+
 # Shared singleton so the Telegram bot side and the API side operate on the
 # same in-memory job store when wired together in ``bot.main``.
 job_manager = default_job_manager
 
 _VALID_FORMATS = {"txt", "docx", "epub"}
+
+
+@app.get("/api/health")
+async def health() -> dict:
+    """Lightweight liveness probe.
+
+    Deliberately does no I/O and requires no configuration/credentials, so
+    it stays fast and reliable for uptime checks/load balancers even if a
+    downstream dependency (OCR engine, disk) is degraded. Never exposes
+    configuration values or secrets - only a status flag and uptime.
+    """
+    return {
+        "status": "ok",
+        "uptime_seconds": round(time.monotonic() - _process_started_at, 3),
+    }
 
 
 @app.get("/api/config")

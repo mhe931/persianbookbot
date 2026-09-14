@@ -2,13 +2,53 @@
 
 _Last updated: 2026-09-14_
 
-## Current milestone: Mini App UI enhancements + sample evaluation CLI
+## Current milestone: Operations hardening, CI/CD, and hermetic tests
 
-The Telegram Mini App frontend (`web/`) has been upgraded from a minimal
-scaffold to a theme-aware, accessible, resilient UI on branch
-`feature/miniapp-ui-enhancements`, and a new offline-safe sample evaluation
-CLI (`tools/evaluate_sample.py`) has been added, alongside the previously
-verified core pipeline and production OCR backends:
+Milestone 3 (`docs/ROADMAP.md`) has been delivered on branch
+`feature/operations-hardening`: a GitHub Actions CI workflow, structured
+logging, configurable `JobManager` retention/cleanup hooks, a `GET
+/api/health` liveness endpoint, and a fix making the test suite hermetic
+against an ambient local `.env` file — alongside the previously verified
+core pipeline, production OCR backends, and Mini App UI:
+
+- **CI**: `.github/workflows/ci.yml` runs on every push/PR targeting
+  `main`, on an Ubuntu Python 3.10/3.11/3.12 matrix, installing
+  `requirements-dev.txt` and running `pytest tests/` with no credentials
+  required. A lint step runs only if a linter is already configured in the
+  repo (currently none is, so it is skipped rather than forcing a new tool
+  in).
+- **Hermetic test isolation fix**: `Settings` (`src/bot/config.py`) now
+  resolves its dotenv path from `BOT_ENV_FILE` at import time (unset =
+  `.env` as before, `""` = dotenv loading disabled entirely).
+  `tests/conftest.py` sets `BOT_ENV_FILE=""` before any test imports
+  `bot.config`, so `pytest tests/` no longer silently reads a real
+  developer's `BOT_TOKEN`/other secrets from a local `.env` — this was a
+  real, previously-unnoticed bug (`test_settings_default_bot_token_is_none_and_safe`
+  and `test_settings_can_be_constructed_directly_without_env` would fail
+  whenever a workspace had a non-empty `BOT_TOKEN` in `.env`).
+- **Structured logging** (`src/bot/logging_config.py`): a JSON formatter
+  (one object per line, for log aggregation) and a human-readable console
+  formatter, both attaching `job_id`/`user_id`/`duration`/`error` context
+  via `log_event()`/`log_duration()`, with a small set of secret-shaped
+  keys (`bot_token`, `api_key`, ...) always scrubbed before rendering.
+  Configured once at startup via `configure_logging()` (`bot.main`), driven
+  by the new `Settings.log_format`/`Settings.log_level` fields. Integrated
+  into `JobManager.create_job()`/`run_pipeline()`/`cleanup_stale_jobs()`.
+- **Job retention/cleanup hooks** (`src/bot/jobs.py`):
+  `JobManager.cleanup_stale_jobs()` prunes finished jobs (`done`/`failed`/
+  `rate_limited`) and their associated upload/output files once older than
+  the configurable `Settings.job_retention_seconds` TTL (default 24h).
+  In-flight jobs are never touched; every file-removal failure is caught
+  and recorded in the returned `CleanupResult.errors` list instead of
+  raising, so cleanup never crashes on one bad path. The in-memory
+  architecture is unchanged — no database was introduced.
+- **`GET /api/health`** (`src/bot/api.py`): a dependency-free liveness
+  probe returning `{"status": "ok", "uptime_seconds": ...}` — no
+  configuration/secret exposure, suitable for uptime checks/load
+  balancers.
+
+Alongside the previously verified core pipeline, production OCR backends,
+and Mini App:
 
 - PDF rendering + grayscale/deskew preprocessing (`src/ocr/preprocessing.py`)
 - Pluggable OCR engine abstraction with a deterministic offline default
@@ -21,11 +61,14 @@ verified core pipeline and production OCR backends:
   (`src/converters/`)
 - Async in-memory job orchestration shared by both delivery surfaces
   (`src/bot/jobs.py`), now also reporting per-format `output_sizes`
-  (bytes) once a job is `done`, for Mini App download cards
+  (bytes) once a job is `done`, for Mini App download cards, and pruning
+  finished jobs/files past `Settings.job_retention_seconds` via
+  `cleanup_stale_jobs()`
 - Telegram bot handlers with retry-on-rate-limit (`src/bot/telegram_handlers.py`)
 - FastAPI Mini App backend (upload/status/download, plus a new
   `GET /api/config` endpoint exposing `max_file_size_mb`/`formats` so the
-  frontend never hardcodes limits separately from `Settings`)
+  frontend never hardcodes limits separately from `Settings`, and
+  `GET /api/health` for liveness checks)
   (`src/bot/api.py`)
 - **Enhanced static Telegram Mini App frontend (`web/`)**: Telegram
   theme-aware CSS variables (`--tg-theme-*`) with light-mode fallbacks,
@@ -47,7 +90,7 @@ verified core pipeline and production OCR backends:
 
 ## Test status
 
-**83 tests passing**, 0 failing, across:
+**101 tests passing**, 0 failing, across:
 
 - `tests/test_ocr_pipeline.py` — rendering, deskew, OCR abstraction, retry/backoff
 - `tests/test_ocr_production_engines.py` — `PaddleOCREngine`/`VisionLLMOCREngine`
@@ -55,10 +98,15 @@ verified core pipeline and production OCR backends:
   mapping, and retry/backoff, all with `paddleocr`/`httpx` mocked at the
   module boundary
 - `tests/test_converters.py` — TXT/DOCX/EPUB output and RTL directionality
-- `tests/test_bot_config.py` — settings loading/defaults
-- `tests/test_bot_jobs.py` — job lifecycle and status transitions
+- `tests/test_bot_config.py` — settings loading/defaults, hermetic against
+  an ambient local `.env`
+- `tests/test_bot_jobs.py` — job lifecycle/status transitions and
+  `cleanup_stale_jobs()` retention behavior (finished-job pruning,
+  in-flight jobs untouched, file-removal error containment)
+- `tests/test_bot_logging.py` — JSON/console structured logging
+  formatters, `log_event`/`log_duration` context + secret scrubbing
 - `tests/test_bot_telegram_handlers.py` — retry-on-`RetryAfter`/network error
-- `tests/test_bot_api.py` — Mini App upload/status/download/config
+- `tests/test_bot_api.py` — Mini App upload/status/download/config/health
   endpoints, `output_sizes` metadata, and static-asset delivery
   (`index.html`/`app.js`/`style.css`)
 - `tests/test_integration.py` — end-to-end PDF-to-output flow
@@ -131,8 +179,13 @@ checked into the repository.
 - No font binaries are bundled; `PERSIAN_FONT_NAME` is an optional hook and
   falls back to a generic font family if unset — licensing of any real
   Persian font is left to the deployer.
-- No deployment/infrastructure (containers, CI workflows, hosting) has been
-  set up yet; this is out of scope for the current milestone.
+- CI (`.github/workflows/ci.yml`) now exists; containerization/hosting
+  deployment infrastructure is still out of scope (see Milestone 4 in
+  `docs/ROADMAP.md`).
+- `JobManager` remains **in-memory only** — `cleanup_stale_jobs()` prunes
+  stale entries/files but does not persist state across process restarts;
+  a durable/multi-process job store remains out of scope by design (see
+  scope boundaries in `AGENTS.md`).
 - The Mini App frontend (`web/`) is now theme-aware/accessible/resilient
   but still has no job-history/list view and no inline document preview
   before download (tracked as remaining Milestone 2 follow-ups in

@@ -12,14 +12,15 @@ import uvicorn
 from bot import api
 from bot.config import get_settings
 from bot.jobs import default_job_manager
+from bot.logging_config import configure_logging
 from bot.telegram_handlers import build_application
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
 def main() -> None:
     settings = get_settings()
+    configure_logging(log_format=settings.log_format, level=settings.log_level)
 
     Path(settings.output_dir).mkdir(parents=True, exist_ok=True)
     Path(settings.upload_dir).mkdir(parents=True, exist_ok=True)

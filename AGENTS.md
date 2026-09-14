@@ -33,9 +33,25 @@ $env:PYTHONPATH = "$PWD\src"
 
 (`pyproject.toml` sets `pythonpath = ["src"]` for pytest, so plain
 `pytest tests/` from the repo root also works once the venv is active.)
-As of this writing the suite has **83 passing tests** and requires no
+As of this writing the suite has **101 passing tests** and requires no
 network access, real Telegram token, or real OCR backend — the default
-`DummyOCREngine` is fully deterministic and offline.
+`DummyOCREngine` is fully deterministic and offline. The suite is also
+**hermetic against an ambient local `.env` file**: `tests/conftest.py`
+sets `BOT_ENV_FILE=""` before any test imports `bot.config`, which
+disables dotenv loading entirely for the test process (see
+`src/bot/config.py`), so a developer's real `BOT_TOKEN` or other local
+secrets can never leak into `Settings` during `pytest tests/` even though
+`.env` still loads normally for real bot/API runs.
+
+## Continuous integration
+
+`.github/workflows/ci.yml` runs on every push to `main` and every pull
+request targeting `main`, on an Ubuntu matrix of Python 3.10/3.11/3.12: it
+installs `requirements-dev.txt`, runs a lint step only if a linter is
+already configured in the repo (currently none is, so it is skipped rather
+than a new tool being force-added), and runs `pytest tests/` with
+`BOT_ENV_FILE=""` set as defense-in-depth. CI never requires a real
+`BOT_TOKEN`/OCR credential.
 
 ## Architecture summary
 
@@ -48,9 +64,11 @@ network access, real Telegram token, or real OCR backend — the default
   text helpers (`rtl.py`), and the async orchestrator (`pipeline.py`).
 - `src/converters/` — `write_txt`, `write_docx`, `write_epub` (all
   `Book -> pathlib.Path`), plus Persian font configuration (`fonts.py`).
-- `src/bot/` — env-driven config (`config.py`), async job orchestration
-  (`jobs.py`), Telegram handlers (`telegram_handlers.py`), FastAPI Mini App
-  backend (`api.py`), and the process entrypoint (`main.py`).
+- `src/bot/` — env-driven config (`config.py`), structured logging
+  (`logging_config.py`), async job orchestration (`jobs.py`, including
+  `JobManager.cleanup_stale_jobs()` retention hooks), Telegram handlers
+  (`telegram_handlers.py`), FastAPI Mini App backend (`api.py`, including
+  `GET /api/health`), and the process entrypoint (`main.py`).
 - `web/` — static Telegram Mini App frontend (vanilla HTML/CSS/JS):
   Telegram theme CSS variables, RTL/Persian typography, a five-step
   progress indicator, format-selection toggles, download cards with
