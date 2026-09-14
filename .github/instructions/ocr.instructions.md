@@ -17,11 +17,12 @@ the full pipeline context and `AGENTS.md` for repo-wide rules.
 - **Must work fully offline via `DummyOCREngine` (the default)** with zero
   credentials, so tests and CI never need a real OCR service. Any new
   default behavior must preserve this.
-- Real/optional engines (e.g. `TesseractOCREngine`) are selected via the
-  `OCR_ENGINE` env var / `get_ocr_engine(name)` factory, and must fail with
-  a clear `OCRError` only when actually invoked without their runtime
-  dependency present (e.g. `pytesseract` not installed) — never at import
-  time of `ocr.engine`.
+- Real/optional engines (e.g. `TesseractOCREngine`, `PaddleOCREngine`,
+  `VisionLLMOCREngine`) are selected via the `OCR_ENGINE` env var /
+  `get_ocr_engine(name)` factory, and must fail with a clear `OCRError`
+  only when actually invoked/constructed without their runtime dependency
+  present (e.g. `pytesseract`/`paddleocr`/`httpx` not installed, or
+  `VISION_LLM_API_KEY` unset) — never at import time of `ocr.engine`.
 - `DummyOCREngine` is the **known/intentional default limitation**: it
   returns deterministic placeholder Persian text keyed only by page number
   (`متن نمونه صفحه {page_number}`), not real recognized text. Do not change
@@ -56,11 +57,25 @@ the full pipeline context and `AGENTS.md` for repo-wide rules.
   value; keep `"dummy"` as the unconditional default.
 - Any heavy/optional dependency (a new SDK, model weights, GPU runtime)
   must be imported lazily inside the engine class (as `TesseractOCREngine`
-  does with `pytesseract`), never at module import time, so importing
-  `ocr.engine` never requires that dependency to be installed.
+  does with `pytesseract`, `PaddleOCREngine` does with `paddleocr`, and
+  `VisionLLMOCREngine` does with `httpx`), never at module import time, so
+  importing `ocr.engine` never requires that dependency to be installed.
+- Provider-backed engines (e.g. `VisionLLMOCREngine`'s Gemini/Claude HTTP
+  calls) must map throttling/HTTP 429 responses to `RateLimitError` and any
+  other provider failure (network error, non-2xx status, unparseable
+  response) to `OCRError`, so `pipeline._recognize_with_retry` can retry
+  correctly. Never require a provider SDK — use provider-neutral HTTP (a
+  lazily imported `httpx`) instead.
+- Prefer running provider/CPU-bound work synchronously inside `recognize()`
+  itself: `pipeline.process_pdf` already invokes `engine.recognize` via
+  `asyncio.to_thread`, so a blocking implementation here is correct and
+  does not block the event loop.
 
 ## Tests
 
 - New OCR/pipeline behavior must be testable without real PDFs, real OCR
-  credentials, or network access — use generated fixtures. Run
-  `pytest tests/` (46 tests as of this writing) before committing.
+  credentials, or network access — use generated fixtures. Provider/SDK
+  dependencies (`paddleocr`, `httpx`) must be mocked at the module boundary
+  (e.g. `monkeypatch.setitem(sys.modules, ...)`), never actually installed
+  or called. Run `pytest tests/` (71 tests as of this writing) before
+  committing.

@@ -6,20 +6,31 @@ its 46-test suite).
 
 ## Milestone 1 — Real OCR backend
 
-The default `DummyOCREngine` is deterministic placeholder text; the next
-milestone is real Persian text recognition:
+The default `DummyOCREngine` is deterministic placeholder text.
+`PaddleOCREngine` and `VisionLLMOCREngine` (Gemini/Claude) have now been
+added as opt-in `OCREngine` implementations (branch
+`feature/production-ocr-backends`), alongside the existing
+`TesseractOCREngine`:
 
 - Finish validating `TesseractOCREngine` (`OCR_ENGINE=tesseract`) against
   real scanned Persian book pages; document required Tesseract + `fas`
   language-data installation steps.
-- Evaluate and integrate a **PaddleOCR** backend (strong multilingual/Arabic
-  script support) as an additional pluggable `OCREngine` implementation.
-- Evaluate a **Vision-LLM based** OCR backend (e.g. a vision-capable model
-  prompted for transcription) as a higher-accuracy option for degraded
-  scans, behind the same `OCREngine` interface and `OCR_ENGINE` switch.
+- `PaddleOCREngine` (`OCR_ENGINE=paddle`, `pip install .[paddle]`) is
+  implemented with lazy `paddleocr` import, `PADDLE_LANG`/`PADDLE_USE_GPU`
+  configuration, and automatic fallback from `fa` to Arabic-script (`ar`)
+  recognition — still needs validation against real scanned Persian book
+  pages and accuracy benchmarking.
+- `VisionLLMOCREngine` (`OCR_ENGINE=vision_llm`, `pip install .[vision-llm]`)
+  is implemented with provider-neutral HTTP calls to Gemini or Claude
+  (`VISION_LLM_PROVIDER`/`VISION_LLM_API_KEY`/`VISION_LLM_MODEL`),
+  structured transcription prompting, and rate-limit (`RateLimitError`)
+  mapping — still needs validation against real scanned Persian book pages,
+  cost/latency benchmarking, and a real provider API key to exercise
+  end-to-end.
 - Add accuracy/confidence benchmarking against a small real-world Persian
   scanned-book test corpus (kept out of the committed offline test suite,
-  or clearly marked as an opt-in/slow test group).
+  or clearly marked as an opt-in/slow test group), covering all three real
+  backends (`tesseract`, `paddle`, `vision_llm`).
 - Keep `DummyOCREngine` as the permanent zero-credential default for CI and
   local development regardless of which real engines are added.
 

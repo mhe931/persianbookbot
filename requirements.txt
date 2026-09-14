@@ -24,3 +24,10 @@ arabic-reshaper>=3.0.0
 # Document generation
 python-docx>=1.1.0
 EbookLib>=0.18
+
+# Optional production OCR backends (PaddleOCR / Vision-LLM via Gemini or
+# Claude) are NOT installed by default - see pyproject.toml
+# [project.optional-dependencies] ("paddle", "vision-llm") and
+# docs/PROJECT_STATUS.md. Install with e.g. `pip install .[paddle]` or
+# `pip install .[vision-llm]` only if you intend to use OCR_ENGINE=paddle
+# or OCR_ENGINE=vision_llm.

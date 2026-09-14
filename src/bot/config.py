@@ -25,8 +25,22 @@ class Settings(BaseSettings):
     api_host: str = "0.0.0.0"
     api_port: int = 8000
 
-    # OCR engine backend: "dummy" (deterministic offline fallback) or "tesseract".
+    # OCR engine backend: "dummy" (deterministic offline fallback), "tesseract",
+    # "paddle", or "vision_llm".
     ocr_engine: str = "dummy"
+
+    # PaddleOCR backend options (only used when ocr_engine="paddle"). GPU is
+    # off by default so the safe/offline default never assumes CUDA.
+    paddle_use_gpu: bool = False
+    paddle_lang: str = "fa"
+
+    # Vision-LLM backend options (only used when ocr_engine="vision_llm").
+    # "gemini" or "claude"; api key must be supplied via env/.env, never
+    # hardcoded, and is None by default so the engine fails clearly instead
+    # of silently running unauthenticated.
+    vision_llm_provider: str = "gemini"
+    vision_llm_api_key: str | None = None
+    vision_llm_model: str = "gemini-1.5-flash"
 
     # Directories for generated output artifacts and uploaded PDFs.
     output_dir: str = "./data/output"
