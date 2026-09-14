@@ -84,6 +84,13 @@ class Settings(BaseSettings):
     # cleanup hook considers them stale and prunes them. Default: 24h.
     job_retention_seconds: int = 24 * 60 * 60
 
+    # How often (seconds) ``bot.main``'s periodic cleanup worker calls
+    # ``default_job_manager.cleanup_stale_jobs()`` while the process is
+    # running. Default: 1 hour. ``float`` (rather than ``int``) so tests can
+    # use short sub-second intervals; set to a non-positive value to disable
+    # the periodic worker entirely (cleanup remains callable on demand).
+    cleanup_interval_seconds: float = 60 * 60
+
     model_config = SettingsConfigDict(
         env_file=_DOTENV_PATH,
         env_prefix="",

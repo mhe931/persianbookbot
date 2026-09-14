@@ -40,6 +40,15 @@ for the full pipeline context and `AGENTS.md` for repo-wide rules.
   in-flight jobs, and every file-removal failure is caught and recorded in
   the returned `CleanupResult.errors` list rather than raised — do not let
   a single bad path abort cleanup of the remaining jobs.
+- `bot.main.periodic_cleanup_worker()` wraps `cleanup_stale_jobs()` in a
+  configurable periodic loop (`Settings.cleanup_interval_seconds`, default
+  3600s/1h) so a long-running process (Telegram polling or API-only mode)
+  prunes stale jobs automatically without an external scheduler. It
+  requires no credentials, is disabled entirely when
+  `cleanup_interval_seconds <= 0`, and must always be cancelled/awaited
+  cleanly on shutdown (see `main()`'s `post_shutdown`/`finally` handling) —
+  do not add a new run path that starts this worker without also wiring
+  its cancellation.
 
 ## Logging
 
@@ -116,7 +125,7 @@ for the full pipeline context and `AGENTS.md` for repo-wide rules.
 
 - New bot/API behavior must be covered with mocked Telegram objects / an
   in-process FastAPI test client — never a real bot token, live Telegram
-  API call, or real network request. Run `pytest tests/` (101 tests as of
+  API call, or real network request. Run `pytest tests/` (108 tests as of
   this writing) before committing.
 - Tests must stay hermetic against an ambient local `.env` (see the
   `BOT_ENV_FILE` contract note above) — don't add a test that relies on
