@@ -159,3 +159,38 @@ placeholder that returns fixed Persian text per page number. It is
 intentional (keeps tests/CI credential-free) but means no real text is
 recognized yet; see `docs/PROJECT_STATUS.md` and `docs/ROADMAP.md` for the
 plan to add a real OCR backend.
+
+## Live validation / benchmarking (Milestone 5)
+
+`docs/BENCHMARK_RESULTS.md` records the Milestone 5 live-validation
+attempt and is the canonical source for benchmark methodology going
+forward — read it before re-running or extending this work:
+
+- **Docker**: this environment has no `docker` CLI/daemon, so Milestone 5
+  repeated the Milestone 4 static Dockerfile/`docker-compose.yml` audit
+  only. `/api/health` probing, container log inspection, and bind-mount
+  UID/GID 1000 write-permission verification still require a real Docker
+  engine and remain the single highest-priority open item — do not claim
+  a live Docker result without actually running `docker compose up` and
+  observing it.
+- **Benchmark usage**: `tools/evaluate_sample.py <pdf> --engine <name>
+  --json` is the only sanctioned way to gather engine metrics. Always
+  generate/point it at a synthetic (`tests/fixtures/pdf_factory.py`) or
+  explicitly permitted PDF — never a copyrighted book — and never commit
+  the PDF or any generated `data/eval*` output (`/data/` is git-ignored;
+  keep it that way).
+- **Runtime memory guidance**: a 5-page synthetic PDF at 200 DPI through
+  `--engine dummy` peaked at **~83 MiB RSS** (measured with `psutil`
+  polling the process tree). Treat this as a pipeline-overhead floor, not
+  a production sizing number — `tesseract` adds its own C-library
+  footprint, `paddle` adds roughly 1–2 GB for `paddlepaddle` + model
+  weights, and `vision_llm` adds network/HTTP overhead instead of local
+  memory. Size any container `mem_limit`/orchestrator request for the
+  specific engine actually deployed, not the `dummy` baseline.
+- **Missing engines/credentials must skip cleanly, never fail or leak
+  secrets**: `tesseract`/`paddle`/`vision_llm` each returned a one-line
+  actionable JSON error and exit code `2` when their optional dependency
+  (`pytesseract`/`paddleocr`) or credential (`VISION_LLM_API_KEY`) was
+  absent — reproduce that same clean-skip contract in any future benchmark
+  run rather than installing heavyweight/unavailable dependencies or
+  reading `.env` to hunt for a credential.

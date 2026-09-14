@@ -1,8 +1,44 @@
 # Project Status
 
-_Last updated: 2026-09-14 (containerization & deployment milestone)_
+_Last updated: 2026-09-14 (live validation & benchmark reporting milestone)_
 
-## Current milestone: Containerization, deployment readiness, and periodic cleanup scheduling
+## Current milestone: Live validation and OCR benchmark reporting
+
+Milestone 5 (`docs/ROADMAP.md`) was attempted on branch
+`feature/live-validation-benchmarks`: a live Docker build/run smoke test
+and real-corpus OCR engine benchmarking were both attempted, on top of the
+Milestone 4 containerization work below. **No Docker engine and no
+optional OCR dependency/credential (`pytesseract`, `paddleocr`,
+`VISION_LLM_API_KEY`) were available in this environment**, so this
+milestone produced a static Docker/compose audit, a fully offline `dummy`
+engine benchmark against a synthetic (non-copyrighted) sample PDF, and
+clean/actionable skip evidence for `tesseract`/`paddle`/`vision_llm` —
+recorded in full in `docs/BENCHMARK_RESULTS.md`:
+
+- **Docker**: `docker` CLI is not installed in this environment (`docker
+  --version`/`docker info` both fail with `CommandNotFoundException`).
+  Static audit repeated the Milestone 4 checks (Dockerfile instruction
+  review, `docker-compose.yml` YAML/schema parse) — both still pass — but
+  no image was built, no container ran, `/api/health` was not probed, and
+  bind-mount UID/GID 1000 write permissions were not exercised live. This
+  remains the top open follow-up (see `docs/ROADMAP.md`).
+- **`tools/evaluate_sample.py --engine dummy --json`**: ran successfully
+  against an in-memory-generated synthetic 5-page PDF (reused
+  `tests/fixtures/pdf_factory.py::make_sample_pdf_bytes`, never staged/
+  committed — written only to the git-ignored `/data/` directory and
+  deleted afterward). Reported ~1.07s runtime, 4.65 pages/s, and (measured
+  separately with `psutil`) ~83 MiB peak RSS for the whole process tree —
+  a `dummy`-engine/small-fixture memory floor, not a real-OCR benchmark.
+- **`tesseract`/`paddle`/`vision_llm`**: each cleanly failed with exit code
+  `2` and an actionable one-line JSON error (`pytesseract`/`paddleocr` not
+  installed; `VISION_LLM_API_KEY` not set) — no stack traces, no partial
+  credentials, and the local `.env` file was never opened/read to check
+  for a real key (only `os.environ` was inspected).
+- Full findings, exact commands, JSON output, environment/hardware
+  context, limitations, and recommended production engine setup are in
+  the new `docs/BENCHMARK_RESULTS.md`.
+
+## Previous milestone: Containerization, deployment readiness, and periodic cleanup scheduling
 
 Milestone 4 (`docs/ROADMAP.md`) has been delivered on branch
 `feature/containerization-deployment`: a production-ready multi-stage
@@ -205,6 +241,12 @@ rate-limit retries, `3` pipeline failure) instead of a raw traceback. Never
 requires network access or real books to be committed - no sample PDFs are
 checked into the repository.
 
+See `docs/BENCHMARK_RESULTS.md` for a recorded Milestone 5 run of this tool
+(synthetic PDF, `dummy` engine metrics + peak-RSS measurement, and clean
+skip evidence for `tesseract`/`paddle`/`vision_llm` when their optional
+dependency/credential is absent) plus recommended per-engine memory/setup
+guidance for production use.
+
 ## Known limitations
 
 - **Dummy OCR is the default engine.** `OCR_ENGINE=dummy` (the default in
@@ -233,11 +275,20 @@ checked into the repository.
   falls back to a generic font family if unset — licensing of any real
   Persian font is left to the deployer.
 - **Docker image has not been built/run against a real Docker engine** —
-  the environment used to author Milestone 4 had no Docker installed, so
-  the `Dockerfile`/`docker-compose.yml` were validated statically (see
-  above) only. Building and running the image (and exercising the
-  `HEALTHCHECK`/volume ownership end-to-end) against a real engine is the
-  key open follow-up.
+  no Docker installation was available for either Milestone 4 or the
+  Milestone 5 live-validation attempt, so the `Dockerfile`/
+  `docker-compose.yml` remain validated statically only (see above and
+  `docs/BENCHMARK_RESULTS.md`). Building and running the image (and
+  exercising the `HEALTHCHECK`/bind-mount volume ownership end-to-end)
+  against a real engine is the key open follow-up.
+- **No real scanned Persian PDF or OCR engine dependency/credential was
+  available to benchmark** — `tools/evaluate_sample.py` was exercised with
+  a synthetic (non-copyrighted) fixture and the `dummy` engine only;
+  `tesseract`/`paddle`/`vision_llm` produced clean, actionable skip errors
+  (missing `pytesseract`/`paddleocr`/`VISION_LLM_API_KEY`) rather than real
+  recognition results. See `docs/BENCHMARK_RESULTS.md` for full details and
+  recommended per-engine memory/setup guidance once each dependency is
+  available.
 - `JobManager` remains **in-memory only** — `cleanup_stale_jobs()` prunes
   stale entries/files but does not persist state across process restarts;
   a durable/multi-process job store remains out of scope by design (see
@@ -277,6 +328,7 @@ checked into the repository.
 ## Links
 
 - Architecture: [`docs/ARCHITECTURE.md`](ARCHITECTURE.md)
+- Benchmark results (Milestone 5): [`docs/BENCHMARK_RESULTS.md`](BENCHMARK_RESULTS.md)
 - Roadmap: [`docs/ROADMAP.md`](ROADMAP.md)
 - Agent collaboration guide: [`docs/agents/AGENT_GUIDE.md`](agents/AGENT_GUIDE.md)
 - Global agent rules: [`../AGENTS.md`](../AGENTS.md)
