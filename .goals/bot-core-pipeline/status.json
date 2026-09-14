@@ -1,0 +1,21 @@
+{
+  "goal_id": "bot-core-pipeline",
+  "status": "complete",
+  "iteration": 1,
+  "builder_model": "Claude:Sonnet-4.6",
+  "inspector_model": "Claude:Haiku-4.5",
+  "initial_sha": "532820424a01017447e8cbf2a42fbbea4d57df81",
+  "created_at": "2026-09-14T11:30:07.633+03:00",
+  "history": [
+    {
+      "iteration": 1,
+      "phase": "inspection",
+      "verdict": "PASS",
+      "timestamp": "2026-09-14T12:08:04Z",
+      "summary": "All 46 tests passed. All 9 acceptance criteria met. Implementation is complete, credential-safe, and production-ready. Full scaffold for Persian PDF bot pipeline with OCR/RTL/EPUB/DOCX/TXT converters, Telegram bot, and Mini App delivered.",
+      "test_results": "46 passed, 9 warnings (non-blocking)",
+      "blockers": "none",
+      "feedback_file": ".goals/bot-core-pipeline/inspector-feedback-1.md"
+    }
+  ]
+}
