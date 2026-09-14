@@ -1,0 +1,122 @@
+# Production/staging deployment stack: bot (internal only) + nginx (TLS
+# termination, the only service exposed to the host) + certbot (Let's
+# Encrypt issuance/renewal). Run from the `deploy/` directory:
+#
+#   cd deploy
+#   cp ../.env.example .env   # fill in BOT_TOKEN/WEBHOOK_URL/WEBHOOK_SECRET/etc.
+#   ./setup_host.sh           # one-time host bootstrap (Docker + directories)
+#   docker compose -f docker-compose.prod.yml up -d
+#
+# See ../docs/DEPLOYMENT_GUIDE.md for the full VPS/DNS/TLS walkthrough,
+# including first-issuance vs. renewal Certbot commands.
+#
+# Never commit the real .env used with this file - it holds BOT_TOKEN,
+# WEBHOOK_SECRET, and (optionally) VISION_LLM_API_KEY. Only DOMAIN and
+# CERTBOT_EMAIL below are non-secret and safe to keep as placeholders.
+
+services:
+  bot:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: persianbookbot:latest
+    container_name: persianbookbot-bot
+    # No `ports:` mapping - the bot is only reachable from other containers
+    # on `internal_net` (nginx proxies to it by service name/port 8000).
+    # This is the "bot internal behind nginx" requirement: nothing but
+    # nginx's 80/443 is exposed to the host or the public internet.
+    expose:
+      - "8000"
+    networks:
+      - internal_net
+    volumes:
+      # Persistent uploaded PDFs / generated EPUB/DOCX/TXT output. Matches
+      # the image's fixed non-root UID/GID 1000 (see ../Dockerfile) so
+      # setup_host.sh's `chown 1000:1000 ./data` keeps files readable by
+      # both the host operator and the container without extra steps.
+      - ./data:/app/data
+    env_file:
+      # Runtime-only secret/config injection (BOT_TOKEN, WEBHOOK_URL,
+      # WEBHOOK_SECRET, VISION_LLM_API_KEY, ...). Never baked into the
+      # image; copy .env.example (repo root) to deploy/.env and fill in
+      # real values before starting this stack. deploy/.env is git-ignored
+      # exactly like the repo-root .env and must never be committed.
+      - .env
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: persianbookbot-nginx
+    depends_on:
+      bot:
+        condition: service_healthy
+    ports:
+      # The ONLY host-exposed ports in this stack - TLS termination and
+      # the HTTP->HTTPS/ACME-challenge redirect both live here.
+      - "80:80"
+      - "443:443"
+    networks:
+      - internal_net
+    environment:
+      # Substituted into default.conf.template by the official nginx image's
+      # docker-entrypoint envsubst-on-templates behavior (any *.template
+      # file under /etc/nginx/templates/ is rendered into
+      # /etc/nginx/conf.d/ on container start). Override with a real
+      # hostname at deploy time; never commit a real domain here.
+      - DOMAIN=${DOMAIN:-bot.example.com}
+    volumes:
+      - ./nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro
+      # Let's Encrypt certificate/account state, persisted across restarts
+      # and shared with the certbot service so renewals are picked up
+      # without reissuing from scratch.
+      - ./certbot/conf:/etc/letsencrypt
+      # ACME HTTP-01 challenge webroot, shared with certbot so it can write
+      # the challenge files nginx serves at /.well-known/acme-challenge/.
+      - ./certbot/www:/var/www/certbot
+    restart: unless-stopped
+    healthcheck:
+      # Hits the self-contained /healthz location (default.conf.template)
+      # over plain HTTP - deliberately does not depend on a TLS
+      # certificate already existing, so it stays healthy through the
+      # first-issuance bootstrap window (see ../docs/DEPLOYMENT_GUIDE.md).
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/healthz"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+  certbot:
+    image: certbot/certbot:latest
+    container_name: persianbookbot-certbot
+    networks:
+      - internal_net
+    volumes:
+      # Same ACME state/webroot volumes as nginx so issued certificates and
+      # challenge files are visible to both containers.
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    # Idempotent renewal loop: `certbot renew` is a no-op unless a
+    # certificate is within its renewal window (default ~30 days before
+    # expiry), so restarting this container never re-issues unnecessarily.
+    # First-time issuance is a manual, explicit step (documented in
+    # docs/DEPLOYMENT_GUIDE.md) precisely so a placeholder DOMAIN/no DNS
+    # record never triggers an automated Let's Encrypt request.
+    entrypoint: >
+      /bin/sh -c "trap exit TERM;
+      while :; do
+        certbot renew --webroot -w /var/www/certbot --quiet;
+        sleep 12h;
+      done"
+    restart: unless-stopped
+
+networks:
+  internal_net:
+    # Private bridge network - only nginx publishes ports to the host, so
+    # the bot container is unreachable except through the nginx proxy.
+    driver: bridge

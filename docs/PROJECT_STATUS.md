@@ -1,8 +1,67 @@
 # Project Status
 
-_Last updated: 2026-09-14 (webhook support & evaluation export milestone)_
+_Last updated: 2026-09-14 (staging deployment infrastructure milestone)_
 
-## Current milestone: Production staging webhook support and evaluation export
+## Current milestone: Staging infrastructure and cloud deployment playbook
+
+Delivered on branch `feature/staging-deploy-infra`: a production-oriented
+deployment bundle under `deploy/` that composes the bot behind Nginx with
+Certbot-managed Let's Encrypt TLS, plus `docs/DEPLOYMENT_GUIDE.md`, on top
+of the webhook-support milestone below.
+
+- **`deploy/docker-compose.prod.yml`** — three services: `bot` (no
+  host-published ports, only `expose: ["8000"]` on a private
+  `internal_net` bridge network — reachable exclusively through nginx),
+  `nginx` (`nginx:1.27-alpine`, the *only* service publishing `80`/`443`
+  to the host, `depends_on: bot: condition: service_healthy`), and
+  `certbot` (`certbot/certbot`, an idempotent `certbot renew` loop sharing
+  TLS/ACME volumes with nginx). Persistent volumes: `./data` (bot job
+  files), `./certbot/conf` (Let's Encrypt state), `./certbot/www` (ACME
+  HTTP-01 webroot). Runtime secrets flow only through `env_file: .env`;
+  every service has `restart: unless-stopped` and a `healthcheck:`.
+- **`deploy/nginx/default.conf.template`** — rendered by the official
+  nginx image's envsubst-on-templates mechanism (only `${DOMAIN}` is
+  substituted). Provides an HTTP→HTTPS redirect, the ACME challenge
+  location, a TLS-independent `/healthz` (so the Docker healthcheck
+  survives the pre-certificate bootstrap window), and HTTPS
+  reverse-proxying of `/` and `/api/` to `bot:8000` with standard
+  forwarded headers (`X-Real-IP`, `X-Forwarded-For`, `X-Forwarded-Proto`,
+  `X-Forwarded-Host`) and explicit `X-Telegram-Bot-Api-Secret-Token`
+  pass-through for the webhook route. No real domain is hardcoded
+  anywhere in the file.
+- **`deploy/setup_host.sh`** — idempotent Ubuntu/Debian bootstrap:
+  detects an existing Docker Engine/Compose plugin and only installs from
+  Docker's official apt repository if missing; creates
+  `deploy/data`/`deploy/certbot` with UID/GID 1000-compatible ownership
+  (matching the `app` user baked into `../Dockerfile`); generates
+  `deploy/.env` from `.env.example` only if it does not already exist.
+  Never starts containers, never requests/renews a certificate, never
+  writes a real secret.
+- **`docs/DEPLOYMENT_GUIDE.md`** (new) — end-to-end VPS/DNS/TLS runbook:
+  host bootstrap, the two-phase first-TLS-certificate bootstrap (nginx
+  cannot start with a `443 ssl` block pointing at a certificate that
+  doesn't exist yet), webhook registration/verification via
+  `getWebhookInfo`, secret rotation, `/api/health`/`/healthz` validation,
+  backup/rollback, and a troubleshooting table.
+- **Tests**: `tests/test_deploy_configs.py` (new, 32 tests) statically
+  validates the entire bundle — compose YAML structure/services/
+  networking/volumes/env-injection/restart/healthchecks, nginx template
+  redirect/ACME/proxy/header/domain-placeholder rules, and
+  `setup_host.sh` idempotency/UID-GID/no-secrets/no-container-start
+  safety — with no Docker engine or network access required. The full
+  suite is **157 passing tests**, still fully offline with
+  `DummyOCREngine` and zero credentials.
+- **Not live-validated** (documented rather than worked around, same as
+  every prior milestone in this environment): no Docker engine, no public
+  DNS record, and no cloud VPS/account were available, so no command in
+  `docs/DEPLOYMENT_GUIDE.md` was actually executed — no image was built
+  from `deploy/docker-compose.prod.yml`, no certificate was issued, and
+  no live Telegram webhook was registered through this stack. The
+  configuration is reviewed and statically verified only.
+- README.md/AGENTS.md/`.github/instructions/bot.instructions.md` updated
+  with pointers to the new `deploy/` bundle and its unverified-live status.
+
+## Previous milestone: Production staging webhook support and evaluation export
 
 Delivered on branch `feature/production-staging-webhook`: secure Telegram
 webhook support (as an opt-in alternative to polling), a CSV export mode
@@ -340,12 +399,14 @@ guidance for production use.
   falls back to a generic font family if unset — licensing of any real
   Persian font is left to the deployer.
 - **Docker image has not been built/run against a real Docker engine** —
-  no Docker installation was available for either Milestone 4 or the
-  Milestone 5 live-validation attempt, so the `Dockerfile`/
-  `docker-compose.yml` remain validated statically only (see above and
-  `docs/BENCHMARK_RESULTS.md`). Building and running the image (and
-  exercising the `HEALTHCHECK`/bind-mount volume ownership end-to-end)
-  against a real engine is the key open follow-up.
+  no Docker installation was available for Milestone 4, the Milestone 5
+  live-validation attempt, or the Milestone 7 staging-deployment bundle,
+  so the `Dockerfile`/`docker-compose.yml`/`deploy/docker-compose.prod.yml`
+  remain validated statically only (see above and
+  `docs/BENCHMARK_RESULTS.md`/`docs/DEPLOYMENT_GUIDE.md`). Building and
+  running the images (and exercising the `HEALTHCHECK`/bind-mount volume
+  ownership, TLS issuance, and live webhook delivery end-to-end) against a
+  real engine/VPS/DNS record is the key open follow-up.
 - **No real scanned Persian PDF or OCR engine dependency/credential was
   available to benchmark** — `tools/evaluate_sample.py` was exercised with
   a synthetic (non-copyrighted) fixture and the `dummy` engine only;
@@ -379,6 +440,12 @@ guidance for production use.
   `./data` volume, `env_file: .env` runtime injection, `restart:
   unless-stopped`) + `.dockerignore`; validated statically (no Docker
   engine available in this environment — see "Known limitations").
+- ✅ Production/staging reverse-proxy bundle (`deploy/`): Nginx +
+  Certbot-managed Let's Encrypt TLS in front of the bot container, an
+  idempotent `setup_host.sh` bootstrap script, and
+  `docs/DEPLOYMENT_GUIDE.md`; validated statically via
+  `tests/test_deploy_configs.py` only (no VPS/DNS/Docker engine available
+  — see "Known limitations").
 - ✅ Periodic in-process cleanup: `bot.main.periodic_cleanup_worker()`
   invokes `default_job_manager.cleanup_stale_jobs()` hourly by default
   (`Settings.cleanup_interval_seconds`), with clean cancellation on
@@ -386,14 +453,15 @@ guidance for production use.
 - ⚠️ Real Persian OCR output requires switching `OCR_ENGINE` to a real
   backend and validating it against real scans (tracked in
   `docs/ROADMAP.md`).
-- ⚠️ The container image itself has not been built/run — build/run
-  validation against a real Docker engine is the key remaining deployment
-  follow-up.
+- ⚠️ Neither the base container image nor the `deploy/` production stack
+  has been built/run — build/run validation against a real Docker
+  engine, DNS record, and VPS is the key remaining deployment follow-up.
 
 ## Links
 
 - Architecture: [`docs/ARCHITECTURE.md`](ARCHITECTURE.md)
 - Benchmark results (Milestone 5): [`docs/BENCHMARK_RESULTS.md`](BENCHMARK_RESULTS.md)
+- Deployment guide (Milestone 7): [`docs/DEPLOYMENT_GUIDE.md`](DEPLOYMENT_GUIDE.md)
 - Roadmap: [`docs/ROADMAP.md`](ROADMAP.md)
 - Agent collaboration guide: [`docs/agents/AGENT_GUIDE.md`](agents/AGENT_GUIDE.md)
 - Global agent rules: [`../AGENTS.md`](../AGENTS.md)

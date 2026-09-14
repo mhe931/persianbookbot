@@ -33,7 +33,7 @@ $env:PYTHONPATH = "$PWD\src"
 
 (`pyproject.toml` sets `pythonpath = ["src"]` for pytest, so plain
 `pytest tests/` from the repo root also works once the venv is active.)
-As of this writing the suite has **125 passing tests** and requires no
+As of this writing the suite has **157 passing tests** and requires no
 network access, real Telegram token, or real OCR backend — the default
 `DummyOCREngine` is fully deterministic and offline. The suite is also
 **hermetic against an ambient local `.env` file**: `tests/conftest.py`
@@ -93,6 +93,9 @@ than a new tool being force-added), and runs `pytest tests/` with
 - `Dockerfile` / `docker-compose.yml` / `.dockerignore` — multi-stage,
   non-root (UID/GID 1000) container build and compose orchestration for
   deployment; see "Containerization / deployment" below.
+- `deploy/` — production/staging deployment bundle (Nginx + Certbot
+  compose stack, host bootstrap script, deployment guide); see
+  "Production deployment bundle" below.
 
 ## Webhook mode
 
@@ -163,6 +166,45 @@ than a new tool being force-added), and runs `pytest tests/` with
   API-only path) so no cleanup sweep is left dangling. It requires no
   credentials and is disabled (returns immediately) when
   `cleanup_interval_seconds <= 0`.
+
+## Production deployment bundle (`deploy/`)
+
+- `deploy/docker-compose.prod.yml` composes `bot` + `nginx` + `certbot`:
+  `bot` has no host-published `ports:` (only `expose: ["8000"]` on the
+  shared `internal_net` network) so it is reachable only through `nginx`;
+  `nginx` is the sole service publishing `80`/`443` to the host;
+  `certbot` shares the `./certbot/conf` (TLS state) and `./certbot/www`
+  (ACME webroot) volumes with `nginx` and runs an idempotent
+  `certbot renew` loop.
+- `deploy/nginx/default.conf.template` is rendered by the official
+  `nginx:1.27-alpine` image's envsubst-on-templates behavior — only
+  `${DOMAIN}` is substituted at container start; never hardcode a real
+  domain into this file (use the `DOMAIN` compose/shell environment
+  variable instead). It redirects HTTP→HTTPS, serves the ACME challenge
+  and a cert-independent `/healthz` (used by the nginx `HEALTHCHECK`) over
+  plain HTTP, and reverse-proxies `/` and `/api/` (including the
+  `X-Telegram-Bot-Api-Secret-Token` header) to `bot:8000` over HTTPS.
+- The first-ever TLS certificate for a domain requires a short two-phase
+  bootstrap (start HTTP-only, obtain the cert via the webroot method,
+  then enable the HTTPS server block) because nginx cannot start with a
+  `ssl_certificate` directive pointing at a file that doesn't exist yet —
+  see `docs/DEPLOYMENT_GUIDE.md` step 5 for the exact commands. Do not
+  "fix" this by shipping a bundled/self-signed certificate in the repo.
+- `deploy/setup_host.sh` is idempotent host bootstrap only — it
+  checks/installs Docker, creates UID/GID 1000-compatible
+  `deploy/data`/`deploy/certbot` directories, and generates
+  `deploy/.env` from `.env.example` **only if it does not already
+  exist**. It must never start containers, request/renew a TLS
+  certificate, or write a real secret value — those are explicit,
+  documented operator steps in `docs/DEPLOYMENT_GUIDE.md`.
+- `tests/test_deploy_configs.py` statically validates this entire bundle
+  (YAML/template parsing, service/volume/header/ACME coverage, script
+  safety) with no Docker engine or network access — keep it passing for
+  any change under `deploy/`.
+- No command under `deploy/` has been executed against a real VPS/DNS/
+  Docker engine in this repository's dev/CI environment — see
+  `docs/DEPLOYMENT_GUIDE.md`'s status note and `docs/PROJECT_STATUS.md`
+  before claiming otherwise.
 
 ## Git conventions
 

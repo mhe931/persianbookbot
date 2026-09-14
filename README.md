@@ -19,6 +19,9 @@ assembly -> EPUB/DOCX/TXT output -> Telegram bot / Mini App delivery
 - `src/bot/` — configuration, async job orchestration, Telegram handlers,
   and the FastAPI Mini App backend
 - `web/` — static Telegram Mini App frontend (vanilla HTML/CSS/JS)
+- `deploy/` — production/staging deployment bundle (Nginx + Certbot
+  compose stack, host bootstrap script); see "Production/staging
+  deployment" below
 - `docs/agents/` — agent collaboration guide and operational runbook
 - `tests/` — pytest suite covering the pipeline, converters, and bot/API
 
@@ -96,6 +99,11 @@ Telegram `Application`, all exercised in `tests/test_bot_webhook.py`) —
 not against Telegram's real servers. Live validation is the next step on
 a host that has those prerequisites (see `docs/PROJECT_STATUS.md`).
 
+For a ready-made production reverse-proxy stack (Nginx + Certbot-managed
+TLS, non-root bot container) instead of the snippet above, see
+[`deploy/`](deploy/) and
+[`docs/DEPLOYMENT_GUIDE.md`](docs/DEPLOYMENT_GUIDE.md).
+
 ## Sample evaluation CLI
 
 `tools/evaluate_sample.py` runs the real OCR/conversion pipeline against a
@@ -166,6 +174,27 @@ Notes:
   `CLEANUP_INTERVAL_SECONDS` (default 3600s/1h) for the lifetime of the
   process, and is cancelled cleanly on shutdown. Set it to `0` to disable
   the periodic sweep (cleanup stays callable on demand).
+
+## Production/staging deployment (Nginx + TLS)
+
+For an internet-facing staging/production deployment — bot container
+kept internal, Nginx as the only host-exposed service (ports 80/443),
+Certbot-managed Let's Encrypt TLS with automatic renewal, and an
+idempotent Ubuntu/Debian host bootstrap script — see:
+
+- [`deploy/docker-compose.prod.yml`](deploy/docker-compose.prod.yml) —
+  `bot` + `nginx` + `certbot` services.
+- [`deploy/nginx/default.conf.template`](deploy/nginx/default.conf.template) —
+  HTTP→HTTPS redirect, ACME challenge, and reverse-proxy rules.
+- [`deploy/setup_host.sh`](deploy/setup_host.sh) — Docker install,
+  UID/GID 1000-compatible directories, safe `.env` template generation.
+- [`docs/DEPLOYMENT_GUIDE.md`](docs/DEPLOYMENT_GUIDE.md) — the full
+  VPS/DNS/TLS/webhook/secret-rotation/backup/rollback runbook.
+
+This bundle is statically validated (`tests/test_deploy_configs.py`) but
+**not** exercised against a real VPS/DNS/Docker engine in this repository
+— see the guide's status note and `docs/PROJECT_STATUS.md` for exactly
+what remains unverified.
 
 See [`docs/agents/AGENT_GUIDE.md`](docs/agents/AGENT_GUIDE.md) for the full
 architecture, subsystem boundaries, and operational runbook.
