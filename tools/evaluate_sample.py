@@ -16,6 +16,11 @@ Fully offline, zero-credential smoke test (default engine)::
 
     python tools/evaluate_sample.py path/to/book.pdf
 
+Machine-readable output (pick one; mutually exclusive)::
+
+    python tools/evaluate_sample.py path/to/book.pdf --json
+    python tools/evaluate_sample.py path/to/book.pdf --csv > metrics.csv
+
 Real backends (each requires its own optional dependency/credential - see
 ``docs/PROJECT_STATUS.md``)::
 
@@ -49,6 +54,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import csv
 import json
 import os
 import sys
@@ -127,6 +133,15 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Initial retry backoff in seconds, doubled per attempt (default: %(default)s).",
     )
     parser.add_argument("--json", action="store_true", help="Print machine-readable JSON metrics only.")
+    parser.add_argument(
+        "--csv",
+        action="store_true",
+        help=(
+            "Print metrics as a single CSV row (header + data) instead of the "
+            "human-readable report; useful for aggregating multiple runs in a "
+            "spreadsheet. Mutually exclusive with --json."
+        ),
+    )
 
     # Optional per-engine overrides, applied as environment variables so
     # ocr.engine.get_ocr_engine() - the single source of truth for engine
@@ -279,14 +294,56 @@ def _print_human_report(metrics: dict) -> None:
         print(f"  - {fmt.upper():<5} {path} ({size_str})")
 
 
+def _print_csv_report(metrics: dict) -> None:
+    """Print a single CSV row (header + data) with the same metrics as the
+    human-readable/JSON reports, for spreadsheet-friendly aggregation
+    across multiple evaluation runs. Always emits one column per possible
+    output format (``FORMAT_CHOICES``) so the header stays stable
+    regardless of ``--formats``; columns for formats that weren't
+    requested are left blank rather than omitted.
+    """
+    scalar_fields = [
+        "pdf_path",
+        "engine",
+        "dpi",
+        "runtime_seconds",
+        "page_count",
+        "pages_per_second",
+        "total_characters",
+        "average_characters_per_page",
+        "average_confidence",
+        "output_dir",
+    ]
+    fieldnames = (
+        scalar_fields
+        + [f"{fmt}_path" for fmt in FORMAT_CHOICES]
+        + [f"{fmt}_size_bytes" for fmt in FORMAT_CHOICES]
+    )
+
+    row = {name: metrics.get(name, "") for name in scalar_fields}
+    for fmt in FORMAT_CHOICES:
+        row[f"{fmt}_path"] = metrics["output_paths"].get(fmt, "")
+        row[f"{fmt}_size_bytes"] = metrics["output_sizes"].get(fmt, "")
+
+    writer = csv.DictWriter(sys.stdout, fieldnames=fieldnames, lineterminator="\n")
+    writer.writeheader()
+    writer.writerow(row)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_arg_parser()
     args = parser.parse_args(argv)
+
+    if args.json and args.csv:
+        print("error: --json and --csv are mutually exclusive.", file=sys.stderr)
+        return EXIT_USAGE
 
     exit_code, metrics = run(args)
 
     if args.json:
         print(json.dumps(metrics, ensure_ascii=False, indent=2))
+    elif args.csv and exit_code == EXIT_OK:
+        _print_csv_report(metrics)
     elif exit_code == EXIT_OK:
         _print_human_report(metrics)
     else:

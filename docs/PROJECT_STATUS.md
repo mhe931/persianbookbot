@@ -1,8 +1,73 @@
 # Project Status
 
-_Last updated: 2026-09-14 (live validation & benchmark reporting milestone)_
+_Last updated: 2026-09-14 (webhook support & evaluation export milestone)_
 
-## Current milestone: Live validation and OCR benchmark reporting
+## Current milestone: Production staging webhook support and evaluation export
+
+Delivered on branch `feature/production-staging-webhook`: secure Telegram
+webhook support (as an opt-in alternative to polling), a CSV export mode
+for `tools/evaluate_sample.py`, and honest documentation of what could/
+could not be live-validated in this environment, on top of the Milestone 5
+work below.
+
+- **`Settings.webhook_secret`** (`src/bot/config.py`, new field alongside
+  the existing `webhook_url`) — the shared secret Telegram must echo back
+  via `X-Telegram-Bot-Api-Secret-Token` on every webhook request.
+  `.env.example` documents both as empty placeholders; `webhook_url`
+  remains fully optional (polling stays the default whenever it is unset).
+- **`POST /api/telegram/webhook`** (`src/bot/api.py`) — validates the
+  secret header before ever parsing the request body (missing header:
+  `401`; wrong or unconfigured secret: `403`), then parses the JSON body
+  into a `telegram.Update` and dispatches it through the *same*
+  `telegram.ext.Application`/handlers polling mode uses
+  (`app.state.telegram_application`, wired in by webhook mode only). A
+  malformed payload is rejected `400` rather than crashing; the configured
+  secret is never logged, echoed, or otherwise exposed.
+- **`bot.main`** now has three mutually exclusive run paths —
+  `_run_polling_mode()` (default, unchanged behavior), `_run_webhook_mode()`
+  (new: single event loop, `Application.initialize()`/`.start()` +
+  `Bot.set_webhook()` instead of `run_polling()`, so there is no
+  conflicting-polling situation), and `_run_api_only_mode()` (unchanged) —
+  selected purely from whether `bot_token`/`webhook_url` are configured.
+- **`tools/evaluate_sample.py --csv`** — a new output mode alongside the
+  existing human-readable/`--json` reports: a single CSV header+data row
+  (stable column set — one `<format>_path`/`<format>_size_bytes` pair per
+  possible output format, blank for formats not requested via
+  `--formats`), for aggregating multiple evaluation runs in a
+  spreadsheet. `--json`/`--csv` together is a usage error (exit `1`);
+  missing optional dependencies/credentials (`pytesseract`, `paddleocr`,
+  `VISION_LLM_API_KEY`) still produce the same clear, actionable `stderr`
+  message and exit code `2` in every output mode, and errors never leak a
+  partial JSON/CSV payload onto `stdout`.
+- **Tests**: `tests/test_bot_webhook.py` (new, 16 tests) covers secret
+  validation, the 503 "not wired" fallback, valid-update dispatch through
+  a mocked `Application` (using a real, network-free `telegram.Bot(...)`
+  object so `Update.de_json` can build nested objects correctly),
+  malformed-payload handling, secret-leak prevention, `Settings` field
+  coverage, and `bot.main.main()`'s polling/webhook/API-only mode
+  selection. `tests/test_tools_evaluate_sample.py` gained 4 new `--csv`
+  tests. The full suite is **125 passing tests**, still fully offline
+  with `DummyOCREngine` and zero credentials.
+- **Staging/live-validation limitations** (same environment constraints as
+  Milestone 5, restated honestly rather than worked around): no
+  `BOT_TOKEN`, no public HTTPS endpoint/reverse proxy, and no Docker
+  engine were available, so:
+  - Webhook registration against Telegram's real `setWebhook` API and
+    delivery through an actual reverse proxy were **not** exercised —
+    only the route's secret-validation/parsing/dispatch logic was tested
+    offline (`ASGITransport`, in-process, no network).
+  - No new Docker/container validation was attempted this milestone; the
+    Milestone 4/5 static audit findings (Dockerfile/`docker-compose.yml`
+    parse-only checks) still stand unchanged — see Milestone 5 below.
+  - No OCR benchmark corpus run was repeated this milestone (CSV export
+    was validated with the existing synthetic/dummy-engine fixture only,
+    per the same non-copyrighted-content constraint as Milestone 5).
+- README.md/AGENTS.md/`.github/instructions/bot.instructions.md`/
+  `.github/instructions/ocr.instructions.md`/`docs/ROADMAP.md` updated
+  with webhook reverse-proxy setup, secret injection, polling-fallback
+  guarantees, and `--csv` usage.
+
+## Previous milestone: Live validation and OCR benchmark reporting
 
 Milestone 5 (`docs/ROADMAP.md`) was attempted on branch
 `feature/live-validation-benchmarks`: a live Docker build/run smoke test

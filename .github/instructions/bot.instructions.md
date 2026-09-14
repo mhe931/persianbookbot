@@ -49,6 +49,42 @@ for the full pipeline context and `AGENTS.md` for repo-wide rules.
   cleanly on shutdown (see `main()`'s `post_shutdown`/`finally` handling) —
   do not add a new run path that starts this worker without also wiring
   its cancellation.
+- `bot.main.main()` selects exactly one of three mutually exclusive run
+  paths — `_run_polling_mode()`, `_run_webhook_mode()`, or
+  `_run_api_only_mode()` — based only on whether `Settings.bot_token` /
+  `Settings.webhook_url` are set. **Polling is the default and must stay
+  the default** whenever `webhook_url` is unset, even with a bot token
+  configured. Never call `Application.run_polling()` from
+  `_run_webhook_mode()` (or vice versa) — running both concurrently for
+  the same bot causes Telegram to reject the polling side with a 409
+  `terminated by other getUpdates request` error.
+
+## Webhook mode (`src/bot/api.py` + `src/bot/main.py`)
+
+- `POST /api/telegram/webhook` (`bot.api.TELEGRAM_WEBHOOK_PATH`) is
+  registered unconditionally on the shared `app` so importing/testing
+  `bot.api` never requires a bot token. It validates
+  `X-Telegram-Bot-Api-Secret-Token` against `settings.webhook_secret`
+  **before** ever parsing the request body: a missing header is `401`; a
+  present-but-wrong (or unconfigured) secret is `403`. Never log, echo, or
+  otherwise expose the configured secret value in a response.
+- The route dispatches through `app.state.telegram_application` (a
+  `telegram.ext.Application`, or `None`) rather than building its own
+  `Bot`/handler set — this is what lets webhook mode reuse the exact same
+  handlers (`telegram_handlers.build_application`) that polling mode uses.
+  `_run_webhook_mode()` (`bot.main`) is the only place that sets
+  `app.state.telegram_application` to a real value (after calling
+  `application.initialize()`/`.start()`); it is reset to `None` on
+  shutdown. If it is `None` (polling mode, API-only mode, or before
+  webhook mode has started up), the route returns `503` rather than
+  raising.
+- `Update.de_json(payload, application.bot)` can raise `TypeError`/
+  `ValueError` for a malformed payload — catch this and respond `400`
+  rather than letting it surface as an unhandled 500.
+- Adding a new webhook-adjacent setting or route must keep `Settings`
+  (not raw `os.environ`) as the single source of truth, per the contract
+  note above, and must not weaken the secret-validation-before-body-parse
+  ordering.
 
 ## Logging
 
@@ -125,8 +161,14 @@ for the full pipeline context and `AGENTS.md` for repo-wide rules.
 
 - New bot/API behavior must be covered with mocked Telegram objects / an
   in-process FastAPI test client — never a real bot token, live Telegram
-  API call, or real network request. Run `pytest tests/` (108 tests as of
+  API call, or real network request. Run `pytest tests/` (125 tests as of
   this writing) before committing.
+- `tests/test_bot_webhook.py` is the pattern to follow for webhook-route
+  tests: assert secret-header validation (401/403), the 503 "not wired"
+  fallback, and dispatch-through-`process_update` using a real (but
+  network-free) `telegram.Bot(token=...)` object rather than a bare
+  `MagicMock` — `Update.de_json()` needs a genuine `Bot` to build nested
+  `Message`/`Chat` objects correctly.
 - Tests must stay hermetic against an ambient local `.env` (see the
   `BOT_ENV_FILE` contract note above) — don't add a test that relies on
   real dotenv content, and prefer `Settings(...)` kwargs or

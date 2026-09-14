@@ -77,7 +77,7 @@ the full pipeline context and `AGENTS.md` for repo-wide rules.
   credentials, or network access — use generated fixtures. Provider/SDK
   dependencies (`paddleocr`, `httpx`) must be mocked at the module boundary
   (e.g. `monkeypatch.setitem(sys.modules, ...)`), never actually installed
-  or called. Run `pytest tests/` (83 tests as of this writing) before
+  or called. Run `pytest tests/` (125 tests as of this writing) before
   committing.
 - `tools/evaluate_sample.py` is a separate local CLI (not part of
   `pytest tests/`) for manually validating any `OCREngine` against a real
@@ -87,4 +87,10 @@ the full pipeline context and `AGENTS.md` for repo-wide rules.
   when an optional dependency or credential is missing — see
   `tests/test_tools_evaluate_sample.py` for the expected exit-code
   contract (`1` usage, `2` missing dependency/credential/rate-limit,
-  `3` pipeline failure).
+  `3` pipeline failure). It supports three mutually-exclusive-ish output
+  modes: human-readable (default), `--json`, and `--csv` (single
+  header+data row with one column pair per possible output format,
+  padded blank for formats not requested via `--formats`); passing both
+  `--json` and `--csv` is a usage error (exit `1`). Errors always print to
+  `stderr`, never as a partial JSON/CSV payload on `stdout`, in every
+  output mode.

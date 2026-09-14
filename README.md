@@ -38,6 +38,89 @@ No real Telegram bot token, OCR credentials, or network access are required
 to run the test suite: the default `DummyOCREngine` is fully deterministic
 and offline.
 
+## Webhook mode
+
+The bot **polls by default** (`Application.run_polling()`) whenever
+`WEBHOOK_URL` is unset — no public URL, TLS, or reverse proxy is required
+for local development. To run behind a reverse proxy instead (e.g. on a
+staging/production host), set both:
+
+```powershell
+# .env
+WEBHOOK_URL=https://bot.example.com     # public HTTPS base URL of your reverse proxy
+WEBHOOK_SECRET=<random value, e.g. `openssl rand -hex 32`>
+```
+
+`bot.main.main()` then runs `_run_webhook_mode()` instead of polling: it
+registers `<WEBHOOK_URL>/api/telegram/webhook` with Telegram
+(`Bot.set_webhook`, including the secret token) and serves the FastAPI app
+(with the webhook route already mounted) on `API_HOST:API_PORT` — polling
+is never started in this mode, so there is no conflict with the webhook.
+
+A minimal nginx reverse-proxy snippet, terminating TLS and forwarding to
+the container/process on port 8000:
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name bot.example.com;
+    ssl_certificate     /etc/letsencrypt/live/bot.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/bot.example.com/privkey.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+Every request to `POST /api/telegram/webhook` must carry a matching
+`X-Telegram-Bot-Api-Secret-Token` header — Telegram sends this
+automatically once `set_webhook(..., secret_token=...)` has been called
+with it, so nothing else needs to set the header. A request with a
+missing header is rejected `401`; a present-but-wrong (or unconfigured)
+secret is rejected `403` — the update body is never parsed until the
+secret validates, and the secret itself is never logged or echoed back.
+
+**Never commit `WEBHOOK_SECRET` or `WEBHOOK_URL` values** — inject them at
+runtime via `.env` (local) or your platform's secret store (staging/
+production), exactly like `BOT_TOKEN`.
+
+**Staging limitation**: this repository's dev/CI environment has no
+`BOT_TOKEN`, public HTTPS endpoint, or Docker engine, so webhook
+registration/reverse-proxy delivery could only be validated offline
+(secret-header validation, update parsing, and dispatch through the
+Telegram `Application`, all exercised in `tests/test_bot_webhook.py`) —
+not against Telegram's real servers. Live validation is the next step on
+a host that has those prerequisites (see `docs/PROJECT_STATUS.md`).
+
+## Sample evaluation CLI
+
+`tools/evaluate_sample.py` runs the real OCR/conversion pipeline against a
+single local PDF and reports runtime/page/character/output metrics,
+without ever requiring a Telegram bot or the FastAPI server to be running:
+
+```powershell
+# Human-readable report (default)
+.\.venv\Scripts\python.exe tools\evaluate_sample.py path\to\book.pdf
+
+# Machine-readable output - pick one (mutually exclusive)
+.\.venv\Scripts\python.exe tools\evaluate_sample.py path\to\book.pdf --json
+.\.venv\Scripts\python.exe tools\evaluate_sample.py path\to\book.pdf --csv > metrics.csv
+```
+
+`--csv` prints a single header+data row (one column per metric, plus a
+`<format>_path`/`<format>_size_bytes` column pair for every possible output
+format so the header stays stable regardless of `--formats`) — handy for
+appending results from multiple runs/engines into one spreadsheet. It is
+fully offline with the default `--engine dummy`; `--engine
+tesseract/paddle/vision_llm` each report a clear, actionable error (exit
+code `2`) on `stderr` if their optional dependency (`pytesseract`/
+`paddleocr`) or credential (`VISION_LLM_API_KEY`) is missing — see
+`docs/PROJECT_STATUS.md` for what real-engine setup requires.
+
 ## Docker / deployment
 
 The bot ships with a production-ready, non-root, multi-stage `Dockerfile`

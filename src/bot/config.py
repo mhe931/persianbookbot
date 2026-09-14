@@ -68,7 +68,17 @@ class Settings(BaseSettings):
     rate_limit_backoff_seconds: float = 2.0
 
     # Optional webhook URL if running the bot in webhook mode instead of polling.
+    # Polling remains the default (used) mode whenever this is unset/empty.
     webhook_url: str | None = None
+
+    # Shared secret Telegram must echo back on every webhook request via the
+    # ``X-Telegram-Bot-Api-Secret-Token`` header (see
+    # https://core.telegram.org/bots/api#setwebhook). Required to actually
+    # accept webhook updates in ``bot.main``'s webhook mode; the webhook
+    # route rejects all requests (403) when this is unset, so an
+    # unconfigured deployment fails closed rather than accepting
+    # unauthenticated updates. Never logged or echoed back in responses.
+    webhook_secret: str | None = None
 
     # Optional Persian font family name used by DOCX/EPUB converters.
     persian_font_name: str | None = None

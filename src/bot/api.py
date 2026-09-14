@@ -3,6 +3,12 @@
 Exposes upload/status/download endpoints under ``/api`` and serves the
 static Mini App frontend (``web/``) at ``/``. Fully importable and testable
 without a bot token or network access.
+
+Also exposes ``POST /api/telegram/webhook`` for webhook-mode deployments
+(see ``bot.main`` and README.md "Webhook mode"); it is a no-op (503) unless
+``bot.main`` wires a built ``telegram.ext.Application`` into
+``app.state.telegram_application``, so importing/testing this module never
+requires a bot token or network access.
 """
 from __future__ import annotations
 
@@ -11,9 +17,11 @@ import logging
 import time
 from pathlib import Path
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from telegram import Update
+from telegram.ext import Application
 
 from common.models import JobStatus
 
@@ -24,6 +32,13 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Persian Book Bot API")
 
+# Populated by ``bot.main`` (webhook mode only) with the built
+# ``telegram.ext.Application`` so the webhook route below can dispatch
+# updates through the same handlers used by polling mode. Left ``None`` in
+# polling mode and API-only mode, in which case the route below responds
+# 503 instead of ever attempting to process an update.
+app.state.telegram_application = None
+
 # Process start time (monotonic clock) for the health endpoint's uptime
 # figure - set at import time, never touched by requests.
 _process_started_at = time.monotonic()
@@ -33,6 +48,60 @@ _process_started_at = time.monotonic()
 job_manager = default_job_manager
 
 _VALID_FORMATS = {"txt", "docx", "epub"}
+
+# Path Telegram posts updates to in webhook mode - see README.md "Webhook
+# mode" and ``bot.main``. Registered unconditionally (present even in
+# polling/API-only mode) so its behavior is consistent and testable; it
+# simply has nothing to dispatch to (503) unless webhook mode wired an
+# ``Application`` into ``app.state.telegram_application``.
+TELEGRAM_WEBHOOK_PATH = "/api/telegram/webhook"
+
+_SECRET_HEADER = "X-Telegram-Bot-Api-Secret-Token"
+
+
+@app.post(TELEGRAM_WEBHOOK_PATH)
+async def telegram_webhook(request: Request) -> dict:
+    """Receive a Telegram update pushed by a webhook (reverse-proxy) setup.
+
+    Validates ``X-Telegram-Bot-Api-Secret-Token`` against
+    ``settings.webhook_secret`` *before* touching the request body: a
+    missing header returns 401, and a present-but-wrong (or unconfigured)
+    secret returns 403. The secret value is never logged, echoed, or
+    included in any response. Only after validation does this parse the
+    JSON body into a ``telegram.Update`` and dispatch it through the same
+    ``Application`` (and therefore the same handlers) polling mode uses.
+    """
+    settings = get_settings()
+    provided = request.headers.get(_SECRET_HEADER)
+
+    if provided is None:
+        raise HTTPException(status_code=401, detail="Missing secret token.")
+    if not settings.webhook_secret or provided != settings.webhook_secret:
+        raise HTTPException(status_code=403, detail="Invalid secret token.")
+
+    application: Application | None = app.state.telegram_application
+    if application is None:
+        raise HTTPException(
+            status_code=503, detail="Telegram webhook is not active on this instance."
+        )
+
+    try:
+        payload = await request.json()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid JSON body.") from exc
+
+    try:
+        update = Update.de_json(payload, application.bot)
+    except (TypeError, ValueError) as exc:
+        # Telegram's Bot API guarantees well-formed updates, but a
+        # misconfigured/forged request could post an unrelated JSON body;
+        # fail with a clean 400 instead of a 500 traceback.
+        raise HTTPException(status_code=400, detail="Invalid update payload.") from exc
+    if update is None:
+        raise HTTPException(status_code=400, detail="Invalid update payload.")
+
+    await application.process_update(update)
+    return {"ok": True}
 
 
 @app.get("/api/health")
