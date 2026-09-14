@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>مبدل کتاب فارسی | Persian Book Bot</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <main class="container">
+    <h1>مبدل کتاب فارسی</h1>
+    <p class="subtitle">Persian Book Converter &mdash; PDF &rarr; EPUB / DOCX / TXT</p>
+
+    <section class="upload-section">
+      <label for="pdf-input" class="file-label">فایل PDF را انتخاب کنید (Choose PDF)</label>
+      <input type="file" id="pdf-input" accept="application/pdf,.pdf" />
+      <button id="upload-btn" type="button">آپلود / Upload</button>
+    </section>
+
+    <section id="status-section" class="status-section hidden">
+      <h2>وضعیت / Status</h2>
+      <p id="status-text">-</p>
+      <div class="progress-bar">
+        <div id="progress-fill" class="progress-fill"></div>
+      </div>
+    </section>
+
+    <section id="downloads-section" class="downloads-section hidden">
+      <h2>دانلود / Download</h2>
+      <div class="download-links">
+        <a id="download-txt" class="download-btn" href="#" download>TXT</a>
+        <a id="download-docx" class="download-btn" href="#" download>DOCX</a>
+        <a id="download-epub" class="download-btn" href="#" download>EPUB</a>
+      </div>
+    </section>
+
+    <section id="error-section" class="error-section hidden">
+      <p id="error-text"></p>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>

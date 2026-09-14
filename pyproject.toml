@@ -1,0 +1,19 @@
+[project]
+name = "persianbookbot"
+version = "0.1.0"
+description = "Telegram bot that converts scanned Persian PDF books into EPUB, DOCX, and TXT via an async Persian OCR/RTL pipeline."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"

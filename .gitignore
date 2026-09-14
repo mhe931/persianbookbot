@@ -216,3 +216,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# persianbookbot runtime data (uploaded PDFs / generated artifacts)
+/data/
+

@@ -1,0 +1,26 @@
+# Core async Telegram bot
+python-telegram-bot[rate-limiter]>=21.0
+
+# Mini App / local API
+fastapi>=0.110
+uvicorn[standard]>=0.29
+python-multipart>=0.0.9
+
+# Configuration
+pydantic>=2.6
+pydantic-settings>=2.2
+python-dotenv>=1.0
+
+# PDF handling / OCR pipeline
+pypdf>=4.0
+PyMuPDF>=1.24
+Pillow>=10.2
+numpy>=1.26
+
+# Persian / RTL text shaping
+python-bidi>=0.4.2
+arabic-reshaper>=3.0.0
+
+# Document generation
+python-docx>=1.1.0
+EbookLib>=0.18
