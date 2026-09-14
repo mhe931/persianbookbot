@@ -30,6 +30,19 @@ job_manager = default_job_manager
 _VALID_FORMATS = {"txt", "docx", "epub"}
 
 
+@app.get("/api/config")
+async def get_config() -> dict:
+    """Expose the handful of settings the Mini App frontend needs to
+    validate uploads client-side (max size, accepted formats) without
+    hardcoding them separately from ``Settings``.
+    """
+    settings = get_settings()
+    return {
+        "max_file_size_mb": settings.max_file_size_mb,
+        "formats": sorted(_VALID_FORMATS),
+    }
+
+
 @app.post("/api/upload")
 async def upload_pdf(file: UploadFile = File(...)) -> dict:
     settings = get_settings()

@@ -10,6 +10,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
+from pathlib import Path
 
 
 class JobStatus(str, Enum):
@@ -111,7 +112,21 @@ class ConversionJob:
             "error": self.error,
             "progress": self.progress,
             "output_paths": self.output_paths,
+            "output_sizes": self._output_sizes(),
             "created_at": self.created_at,
             "updated_at": self.updated_at,
             "retry_count": self.retry_count,
         }
+
+    def _output_sizes(self) -> dict[str, int]:
+        """Best-effort file size (bytes) per output format, for Mini App
+        download cards. Skips formats whose file is missing/unreadable
+        rather than raising - this is presentational metadata only.
+        """
+        sizes: dict[str, int] = {}
+        for fmt, path_str in self.output_paths.items():
+            try:
+                sizes[fmt] = Path(path_str).stat().st_size
+            except OSError:
+                continue
+        return sizes

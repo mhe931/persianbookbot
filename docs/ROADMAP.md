@@ -30,24 +30,50 @@ added as opt-in `OCREngine` implementations (branch
 - Add accuracy/confidence benchmarking against a small real-world Persian
   scanned-book test corpus (kept out of the committed offline test suite,
   or clearly marked as an opt-in/slow test group), covering all three real
-  backends (`tesseract`, `paddle`, `vision_llm`).
+  backends (`tesseract`, `paddle`, `vision_llm`). **Tooling now exists:**
+  `tools/evaluate_sample.py path/to/book.pdf --engine <name>` runs any
+  backend against a local PDF and reports runtime/page/character metrics —
+  the remaining work is running it against a real corpus and recording
+  results, not building the tool itself.
 - Keep `DummyOCREngine` as the permanent zero-credential default for CI and
   local development regardless of which real engines are added.
 
-## Milestone 2 — Mini App UI enhancements
+## Milestone 2 — Mini App UI enhancements ✅ (core UX shipped)
 
-The current `web/` frontend is a minimal vanilla HTML/CSS/JS scaffold:
+The `web/` frontend has been upgraded from a minimal scaffold
+(`feature/miniapp-ui-enhancements`) to a Telegram theme-aware, accessible,
+resilient UI, and a local sample-evaluation CLI has been added:
 
-- Improve upload UX: drag-and-drop, upload progress bar wired to
-  `/api/status/{job_id}`, and clearer error states (oversized file,
-  non-PDF, rate-limited, failed jobs).
+- ✅ Telegram theme CSS variables (`--tg-theme-*`, with light-mode
+  fallbacks), native RTL/Persian typography, and an accessible five-step
+  progress indicator (Uploaded / Preprocessing / OCR / Generating
+  Documents / Ready) driven by `JobStatus` transitions.
+- ✅ EPUB/DOCX/TXT format-selection toggles and download cards with
+  file-size indicators (`ConversionJob.to_dict()["output_sizes"]`).
+- ✅ Defensive `window.Telegram.WebApp` lifecycle integration (`ready`,
+  `expand`, `MainButton`, haptic feedback) that degrades gracefully in a
+  plain (non-Telegram) browser.
+- ✅ Visible upload progress (`XMLHttpRequest` upload events), client-side
+  PDF/20MB validation sourced from the new `GET /api/config` endpoint
+  (rather than a hardcoded limit), and resilient status polling with
+  success/failure/rate-limit/network-error handling plus a retry action.
+- ✅ `tools/evaluate_sample.py` — an offline-safe local CLI to run a real
+  PDF through any of the four `OCREngine` implementations
+  (`dummy`/`tesseract`/`paddle`/`vision_llm`) and report
+  runtime/page/character/output metrics, reusing `ocr.pipeline.process_pdf`
+  and `converters.*` directly.
+
+Still open for a follow-up Mini App iteration:
+
 - Add a job history/list view backed by `JobManager.list_jobs()` (already
   available server-side, not yet exposed via a dedicated endpoint/UI).
-- Add format selection and inline preview before download.
-- Improve RTL/Persian-language presentation of the Mini App itself (labels,
-  layout direction) to match the RTL content it produces.
+- Add inline document preview before download.
 - Consider a lightweight framework or design system if the vanilla
   implementation becomes hard to maintain.
+- Use `tools/evaluate_sample.py` against a small corpus of real
+  (non-copyrighted) scanned Persian PDFs to benchmark `tesseract`/
+  `paddle`/`vision_llm` accuracy — the tool exists now; the benchmarking
+  pass itself is still outstanding (see Milestone 1).
 
 ## Milestone 3 — Bot & operations hardening
 
