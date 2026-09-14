@@ -147,3 +147,16 @@ async def test_download_before_job_done_returns_404(sample_pdf_bytes):
         # has not been awaited/yielded to yet) can have completed.
         download_resp = await client.get(f"/api/download/{job_id}/txt")
         assert download_resp.status_code == 404
+
+
+async def test_health_endpoint_reports_ok_and_uptime():
+    transport = ASGITransport(app=api.app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.get("/api/health")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "ok"
+        assert data["uptime_seconds"] >= 0
+        # Must never leak configuration/secrets on a liveness probe.
+        assert "bot_token" not in data
+        assert set(data.keys()) == {"status", "uptime_seconds"}

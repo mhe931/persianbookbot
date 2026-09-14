@@ -75,19 +75,48 @@ Still open for a follow-up Mini App iteration:
   `paddle`/`vision_llm` accuracy — the tool exists now; the benchmarking
   pass itself is still outstanding (see Milestone 1).
 
-## Milestone 3 — Bot & operations hardening
+## Milestone 3 — Bot & operations hardening ✅ (CI/CD, logging, retention, health)
 
-- Add a `.github/workflows/` CI pipeline running `pytest tests/` on every
-  push/PR (none exists yet — currently run manually).
-- Add structured logging/observability for job failures and rate-limit
-  events across `src/bot/jobs.py` and the OCR pipeline.
+Delivered on branch `feature/operations-hardening`:
+
+- ✅ `.github/workflows/ci.yml` — CI pipeline running `pytest tests/` (plus
+  a lint step that only runs if a linter is already configured) on every
+  push/PR targeting `main`, across an Ubuntu Python 3.10/3.11/3.12 matrix.
+  No credentials required.
+- ✅ Structured JSON/console logging (`src/bot/logging_config.py`) with
+  `job_id`/`user_id`/`duration`/`error` context, integrated into
+  `src/bot/jobs.py` job lifecycle events, with secret-shaped keys always
+  scrubbed before rendering.
+- ✅ `JobManager.cleanup_stale_jobs()` (`src/bot/jobs.py`) — configurable
+  retention/cleanup hooks (`Settings.job_retention_seconds`) that prune
+  finished jobs and their upload/output/temp files older than the TTL,
+  with explicit per-path error handling so one bad file never aborts the
+  rest of cleanup. In-memory architecture preserved — no database added.
+- ✅ `GET /api/health` (`src/bot/api.py`) — lightweight liveness endpoint,
+  covered by tests.
+- ✅ Fixed a real test-isolation bug: config tests previously read a
+  developer's ambient `.env` (e.g. a real `BOT_TOKEN`) instead of the
+  intended safe defaults. `Settings`/`BOT_ENV_FILE` + `tests/conftest.py`
+  now make the whole suite hermetic against local `.env` content.
+
+Still open for a follow-up operations iteration:
+
 - Live-validate the Telegram bot polling path end-to-end with a real
   `BOT_TOKEN` in a controlled environment (currently only unit-tested with
   mocks).
-- Persist `ConversionJob` state (currently in-memory only) if multi-process
-  or restart-safe operation becomes a requirement.
+- Wire `JobManager.cleanup_stale_jobs()` into a periodic background task
+  (e.g. an `asyncio` loop in `bot.main`) so retention happens
+  automatically in a long-running process, rather than only being
+  callable on demand — the hook and its tests exist now; the scheduling
+  wrapper is the remaining piece.
+- Consider exposing job-count/queue-depth metrics alongside `GET
+  /api/health` if operational visibility needs grow beyond a liveness
+  check.
 - Document a font-licensing/bundling story for `PERSIAN_FONT_NAME` if a
   specific font needs to ship with deployments.
+- `ConversionJob` state remains in-memory only by design (see scope
+  boundaries in `AGENTS.md`); persisting it across restarts is explicitly
+  out of scope unless a future milestone changes that requirement.
 
 ## Milestone 4 — Deployment
 
@@ -100,7 +129,10 @@ Still open for a follow-up Mini App iteration:
 
 ## Prioritization notes
 
-Milestone 1 (real OCR) is the highest-value next step since it is the only
-gap between "pipeline scaffold" and "usable product" — everything else
-(converters, job orchestration, delivery surfaces) is already implemented
-and tested end-to-end against the pluggable `OCREngine` interface.
+With Milestone 3 (operations hardening/CI) now delivered, the highest-value
+next steps are: (1) live-validating the real OCR backends and Telegram bot
+polling path against real data/credentials in a controlled environment
+(the remaining open item from Milestones 1 and 3), and (2) Milestone 4
+(deployment/containerization) once that validation work is scheduled —
+everything else (converters, job orchestration, delivery surfaces, CI,
+logging, retention) is already implemented and tested end-to-end.

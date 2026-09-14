@@ -8,10 +8,24 @@ needs a credential.
 """
 from __future__ import annotations
 
+import os
 from functools import lru_cache
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# The dotenv path used by ``Settings`` is resolved once at import time from
+# the ``BOT_ENV_FILE`` environment variable so tests can make configuration
+# loading hermetic (immune to an ambient local ``.env``) without ever
+# touching the file itself:
+#   - unset (default)      -> load "./.env" as usual (real runtime behavior).
+#   - set to "" (empty)    -> dotenv loading is disabled entirely.
+#   - set to a path        -> that path is used instead of "./.env".
+# ``tests/conftest.py`` sets ``BOT_ENV_FILE=""`` before any test imports
+# ``bot.config``, so the test suite never reads real secrets from a local
+# ``.env`` file, regardless of what a developer has in their workspace.
+_env_file_override = os.environ.get("BOT_ENV_FILE")
+_DOTENV_PATH: str | None = ".env" if _env_file_override is None else (_env_file_override or None)
 
 
 class Settings(BaseSettings):
@@ -59,8 +73,19 @@ class Settings(BaseSettings):
     # Optional Persian font family name used by DOCX/EPUB converters.
     persian_font_name: str | None = None
 
+    # Structured logging (see ``bot.logging_config``): "console" (default,
+    # human-readable with appended context) or "json" (one JSON object per
+    # line, for log aggregation). Level is a standard ``logging`` level name.
+    log_format: str = "console"
+    log_level: str = "INFO"
+
+    # How long (seconds) a finished job (done/failed/rate_limited) and its
+    # associated upload/output files are kept before ``JobManager``'s
+    # cleanup hook considers them stale and prunes them. Default: 24h.
+    job_retention_seconds: int = 24 * 60 * 60
+
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=_DOTENV_PATH,
         env_prefix="",
         case_sensitive=False,
         extra="ignore",
