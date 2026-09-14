@@ -1,7 +1,7 @@
 {
   "goal_id": "git-lifecycle-docs",
-  "status": "blocked-test-failures",
-  "iteration": 1,
+  "status": "building",
+  "iteration": 2,
   "builder_model": "Claude:Sonnet-4.6",
   "inspector_model": "Claude:Haiku-4.5",
   "initial_sha": "5f6a847d0a93fdfb5105d864b2c0754910857943",

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -50,6 +51,21 @@ class Settings(BaseSettings):
         case_sensitive=False,
         extra="ignore",
     )
+
+    @field_validator("bot_token", mode="before")
+    @classmethod
+    def _normalize_empty_bot_token(cls, value: object) -> object:
+        """Treat empty/whitespace-only ``BOT_TOKEN`` values as unset.
+
+        ``.env`` files commonly declare ``BOT_TOKEN=`` as a safe placeholder,
+        which pydantic-settings loads as ``""`` rather than leaving the field
+        unset. Normalize that (and any accidental ``"None"`` string) to
+        ``None`` so credential-free defaults hold regardless of how the
+        empty value was sourced.
+        """
+        if isinstance(value, str) and value.strip() in ("", "None"):
+            return None
+        return value
 
 
 @lru_cache
