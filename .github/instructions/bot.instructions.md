@@ -85,6 +85,12 @@ for the full pipeline context and `AGENTS.md` for repo-wide rules.
   (not raw `os.environ`) as the single source of truth, per the contract
   note above, and must not weaken the secret-validation-before-body-parse
   ordering.
+- Production/staging reverse-proxy deployment of this route (nginx
+  terminating TLS, forwarding `/api/` including the secret header) is
+  provided by `deploy/docker-compose.prod.yml` +
+  `deploy/nginx/default.conf.template` — see `docs/DEPLOYMENT_GUIDE.md`
+  for the end-to-end setup and `tests/test_deploy_configs.py` for the
+  offline static checks that bundle is validated against.
 
 ## Logging
 
@@ -161,7 +167,7 @@ for the full pipeline context and `AGENTS.md` for repo-wide rules.
 
 - New bot/API behavior must be covered with mocked Telegram objects / an
   in-process FastAPI test client — never a real bot token, live Telegram
-  API call, or real network request. Run `pytest tests/` (125 tests as of
+  API call, or real network request. Run `pytest tests/` (157 tests as of
   this writing) before committing.
 - `tests/test_bot_webhook.py` is the pattern to follow for webhook-route
   tests: assert secret-header validation (401/403), the 503 "not wired"

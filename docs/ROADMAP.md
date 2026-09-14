@@ -169,6 +169,55 @@ Still open for a follow-up deployment iteration:
   similar) via CI, once that is explicitly requested and a registry/
   credential story is defined — out of scope for this milestone by design.
 
+## Milestone 7 — Staging infrastructure & cloud deployment playbook ✅ (offline-validated; live deployment unverified)
+
+Delivered on branch `feature/staging-deploy-infra`:
+
+- ✅ `deploy/docker-compose.prod.yml`: `bot` (internal-only, no
+  host-published ports, `internal_net` bridge network), `nginx`
+  (`nginx:1.27-alpine`, the only service publishing `80`/`443`,
+  `depends_on: bot: condition: service_healthy`), and `certbot`
+  (idempotent `certbot renew` loop) with persistent `./data`,
+  `./certbot/conf`, and `./certbot/www` volumes, `env_file: .env` runtime
+  injection, `restart: unless-stopped`, and healthchecks on every service.
+- ✅ `deploy/nginx/default.conf.template`: HTTP→HTTPS redirect, ACME
+  HTTP-01 challenge location, a TLS-independent `/healthz`, and HTTPS
+  reverse-proxying of `/` and `/api/` to `bot:8000` with forwarded headers
+  and explicit `X-Telegram-Bot-Api-Secret-Token` pass-through. Only
+  `${DOMAIN}` (envsubst'd at container start) — no hardcoded real domain.
+- ✅ `deploy/setup_host.sh`: idempotent Ubuntu/Debian bootstrap — Docker
+  Engine/Compose-plugin check-then-install, UID/GID 1000-compatible
+  `deploy/data`/`deploy/certbot` directory creation, and safe
+  `deploy/.env` template generation (never overwrites an existing file,
+  never writes a real secret).
+- ✅ `docs/DEPLOYMENT_GUIDE.md` (new): VPS/DNS setup, the two-phase
+  first-TLS-certificate bootstrap, renewal validation, webhook
+  registration/verification, secret rotation, health validation, backups,
+  rollback, and a troubleshooting table.
+- ✅ `tests/test_deploy_configs.py` (new, 32 tests): offline YAML/template
+  parsing and structural checks for every requirement above — no Docker
+  engine or network access required. Full suite is **157 passing tests**.
+- ✅ README/AGENTS/bot instructions/project status updated with pointers
+  to the new `deploy/` bundle and its unverified-live status.
+
+Still open / explicitly **not** validated this milestone (documented
+rather than worked around):
+
+- **No real VPS, DNS record, or Docker engine was available** — no image
+  was built from `deploy/docker-compose.prod.yml`, no certificate was
+  issued via `certbot certonly`, and no live Telegram webhook was
+  registered through this stack. Re-run the entire
+  `docs/DEPLOYMENT_GUIDE.md` walkthrough on a real host to get the first
+  live result — this is now the single highest-priority remaining item
+  across the whole roadmap (supersedes the Milestone 4/5 Docker
+  build/run follow-up below, which this bundle also depends on).
+- **Docker build/run for the base image** — unchanged from Milestone 5;
+  still blocked on no `docker` CLI/daemon in this environment.
+- Consider adding CI-driven `docker compose -f
+  deploy/docker-compose.prod.yml config` validation (or a full build) once
+  a Docker-capable CI runner is available, to catch schema regressions
+  earlier than the next live deployment attempt.
+
 ## Milestone 6 — Webhook support & evaluation export ✅ (offline-validated; live delivery unverified)
 
 Delivered on branch `feature/production-staging-webhook`:
@@ -264,15 +313,17 @@ Still open for a follow-up live-validation iteration:
 
 ## Prioritization notes
 
-With Milestones 3, 4, and 6 delivered and Milestone 5 attempted-but-blocked
-on environment availability, the highest-value next step is unchanged from
-before this milestone: **get access to a host with a real Docker engine
-and a real Telegram bot token/public HTTPS endpoint**, and re-run the
-container smoke test, the real-engine OCR benchmarks, and a live webhook
-registration/delivery check that could not be exercised here (see
-Milestone 5 and Milestone 6 above for the detailed follow-up lists) —
-everything else (converters, job orchestration, delivery surfaces
-including webhook mode, CI, logging, retention, containerization, cleanup
-scheduling, benchmark tooling/reporting/CSV export) is already implemented
-and tested end-to-end.
+With Milestones 3, 4, 6, and 7 delivered and Milestone 5
+attempted-but-blocked on environment availability, the highest-value next
+step is unchanged from before this milestone: **get access to a real
+VPS/cloud host with a Docker engine, a DNS record under your control, and
+a real Telegram bot token**, and run the full `docs/DEPLOYMENT_GUIDE.md`
+walkthrough end-to-end — container smoke test, TLS issuance, and live
+webhook registration/delivery all in one pass, since they all depend on
+the same missing prerequisite (see Milestone 5, Milestone 6, and
+Milestone 7 above for the detailed follow-up lists) — everything else
+(converters, job orchestration, delivery surfaces including webhook mode,
+CI, logging, retention, containerization, cleanup scheduling, benchmark
+tooling/reporting/CSV export, and the Nginx/Certbot deployment bundle
+itself) is already implemented and tested end-to-end.
 

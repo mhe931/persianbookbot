@@ -77,7 +77,7 @@ the full pipeline context and `AGENTS.md` for repo-wide rules.
   credentials, or network access — use generated fixtures. Provider/SDK
   dependencies (`paddleocr`, `httpx`) must be mocked at the module boundary
   (e.g. `monkeypatch.setitem(sys.modules, ...)`), never actually installed
-  or called. Run `pytest tests/` (125 tests as of this writing) before
+  or called. Run `pytest tests/` (157 tests as of this writing) before
   committing.
 - `tools/evaluate_sample.py` is a separate local CLI (not part of
   `pytest tests/`) for manually validating any `OCREngine` against a real
