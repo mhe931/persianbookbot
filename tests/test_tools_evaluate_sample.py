@@ -72,6 +72,90 @@ def test_dummy_engine_human_readable_report(tmp_path, sample_pdf_path):
     assert "Pages processed:     2" in result.stdout
 
 
+def test_dummy_engine_csv_report(tmp_path, sample_pdf_path):
+    import csv
+    import io
+
+    output_dir = tmp_path / "out"
+    result = _run_cli(
+        [str(sample_pdf_path), "--engine", "dummy", "--output-dir", str(output_dir), "--csv"],
+        cwd=tmp_path,
+    )
+
+    assert result.returncode == 0, result.stderr
+    # PyMuPDF may print an unrelated stdout deprecation notice before the
+    # CSV payload in some versions (see the analogous --json test above);
+    # slice from the header row so an incidental library warning can't
+    # break CSV parsing.
+    csv_start = result.stdout.index("pdf_path")
+    rows = list(csv.DictReader(io.StringIO(result.stdout[csv_start:])))
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["engine"] == "dummy"
+    assert int(row["page_count"]) == 2
+    assert float(row["runtime_seconds"]) >= 0
+    assert int(row["total_characters"]) > 0
+    for fmt in ("txt", "docx", "epub"):
+        path = Path(row[f"{fmt}_path"])
+        assert path.exists()
+        assert int(row[f"{fmt}_size_bytes"]) == path.stat().st_size
+
+
+def test_csv_report_leaves_unrequested_format_columns_blank(tmp_path, sample_pdf_path):
+    import csv
+    import io
+
+    output_dir = tmp_path / "out"
+    result = _run_cli(
+        [
+            str(sample_pdf_path),
+            "--engine",
+            "dummy",
+            "--output-dir",
+            str(output_dir),
+            "--formats",
+            "txt",
+            "--csv",
+        ],
+        cwd=tmp_path,
+    )
+
+    assert result.returncode == 0, result.stderr
+    csv_start = result.stdout.index("pdf_path")
+    rows = list(csv.DictReader(io.StringIO(result.stdout[csv_start:])))
+    row = rows[0]
+    assert row["txt_path"]
+    assert row["docx_path"] == ""
+    assert row["epub_path"] == ""
+    assert row["docx_size_bytes"] == ""
+    assert row["epub_size_bytes"] == ""
+
+
+def test_json_and_csv_together_is_a_usage_error(tmp_path, sample_pdf_path):
+    result = _run_cli(
+        [str(sample_pdf_path), "--engine", "dummy", "--output-dir", str(tmp_path / "out"), "--json", "--csv"],
+        cwd=tmp_path,
+    )
+
+    assert result.returncode == 1
+    assert "mutually exclusive" in result.stderr.lower()
+
+
+def test_csv_engine_unavailable_reports_error_on_stderr_not_stdout(tmp_path, sample_pdf_path):
+    """When the engine is unavailable, the error must still go to stderr
+    with a clear, actionable message, and no CSV payload must be printed
+    to stdout - exactly like the JSON/human-readable modes. (An unrelated
+    PyMuPDF import-time deprecation notice may still land on stdout in
+    some library versions, so this checks for the *absence* of CSV output
+    rather than requiring stdout to be completely empty.)
+    """
+    result = _run_cli([str(sample_pdf_path), "--engine", "tesseract", "--csv"], cwd=tmp_path)
+
+    assert result.returncode == 2
+    assert "pdf_path" not in result.stdout
+    assert "pytesseract" in result.stderr.lower() or "tesseract" in result.stderr.lower()
+
+
 def test_missing_pdf_file_exits_nonzero_with_actionable_message(tmp_path):
     missing = tmp_path / "does-not-exist.pdf"
     result = _run_cli([str(missing)], cwd=tmp_path)

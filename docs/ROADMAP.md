@@ -161,12 +161,58 @@ Still open for a follow-up deployment iteration:
   volume ownership end-to-end is the highest-priority remaining item.
 - Consider a `.dockerignore`/build-context size audit and multi-arch
   (`linux/amd64` + `linux/arm64`) build once a real engine is available.
-- Define hosting/runtime requirements for `WEBHOOK_URL` (webhook mode)
-  vs. polling mode behind a reverse proxy/TLS terminator, if a specific
-  hosting target is chosen.
+- ~~Define hosting/runtime requirements for `WEBHOOK_URL` (webhook mode)
+  vs. polling mode behind a reverse proxy/TLS terminator~~ — delivered in
+  Milestone 6 (`WEBHOOK_URL`/`WEBHOOK_SECRET`, `POST
+  /api/telegram/webhook`, reverse-proxy setup in README.md).
 - Consider publishing the built image to a container registry (GHCR or
   similar) via CI, once that is explicitly requested and a registry/
   credential story is defined — out of scope for this milestone by design.
+
+## Milestone 6 — Webhook support & evaluation export ✅ (offline-validated; live delivery unverified)
+
+Delivered on branch `feature/production-staging-webhook`:
+
+- ✅ `Settings.webhook_secret` (new, alongside the existing `webhook_url`)
+  and `.env.example` documentation for both — `webhook_url` stays fully
+  optional, and polling remains the default whenever it is unset.
+- ✅ `POST /api/telegram/webhook` (`src/bot/api.py`): strict
+  `X-Telegram-Bot-Api-Secret-Token` validation (`401` missing, `403`
+  wrong/unconfigured) before the request body is ever parsed, dispatch
+  through the same `Application`/handlers polling mode uses, `400` on a
+  malformed payload, `503` when no application is wired (polling/API-only
+  mode) — never leaks the configured secret.
+- ✅ `bot.main._run_webhook_mode()`: single event loop, `Application`
+  `.initialize()`/`.start()` + `Bot.set_webhook()` instead of
+  `run_polling()`, so webhook mode can never conflict with polling for the
+  same bot.
+- ✅ `tools/evaluate_sample.py --csv`: stable-column CSV export
+  (header+one data row), mutually exclusive with `--json`, same
+  clean-skip/exit-code contract for missing optional dependencies/
+  credentials as the existing human/JSON modes.
+- ✅ `tests/test_bot_webhook.py` (16 new tests) + 4 new `--csv` tests in
+  `tests/test_tools_evaluate_sample.py` — suite is now **125 passing
+  tests**, still fully offline with `DummyOCREngine`.
+- ✅ README/AGENTS/bot & ocr instructions updated with reverse-proxy
+  webhook setup, secret injection, polling-fallback guarantees, and
+  `--csv` usage.
+
+Still open / explicitly **not** validated this milestone (documented
+rather than worked around):
+
+- **Live webhook registration/delivery against Telegram's real servers**
+  — no `BOT_TOKEN` or public HTTPS endpoint was available; only the
+  route's secret-validation/parsing/dispatch logic was exercised offline
+  (in-process `ASGITransport`, no network). Re-run with a real bot token
+  and a reverse proxy (nginx/Caddy/Traefik terminating TLS) on a staging
+  host to confirm end-to-end delivery.
+- **Docker build/run** — unchanged from Milestone 5; still blocked on no
+  `docker` CLI/daemon in this environment. See Milestone 5 below.
+- **Real OCR engine benchmarking with `--csv`** — only exercised against
+  the existing synthetic/dummy-engine fixture, per the same
+  non-copyrighted-content constraint as Milestone 5; re-run
+  `tools/evaluate_sample.py --engine tesseract --csv` (etc.) once a real,
+  permitted sample and the relevant optional dependency are available.
 
 ## Milestone 5 — Live validation & OCR benchmark reporting ⚠️ (attempted; blocked on environment)
 
@@ -218,13 +264,15 @@ Still open for a follow-up live-validation iteration:
 
 ## Prioritization notes
 
-With Milestones 3 and 4 delivered and Milestone 5 attempted-but-blocked on
-environment availability, the highest-value next step is unchanged from
-before this milestone: **get access to a host with a real Docker engine**
-and re-run both the container smoke test and the real-engine OCR
-benchmarks that could not be exercised here (see Milestone 5 above for the
-detailed follow-up list) — everything else (converters, job orchestration,
-delivery surfaces, CI, logging, retention, containerization, cleanup
-scheduling, benchmark tooling/reporting) is already implemented and tested
-end-to-end.
+With Milestones 3, 4, and 6 delivered and Milestone 5 attempted-but-blocked
+on environment availability, the highest-value next step is unchanged from
+before this milestone: **get access to a host with a real Docker engine
+and a real Telegram bot token/public HTTPS endpoint**, and re-run the
+container smoke test, the real-engine OCR benchmarks, and a live webhook
+registration/delivery check that could not be exercised here (see
+Milestone 5 and Milestone 6 above for the detailed follow-up lists) —
+everything else (converters, job orchestration, delivery surfaces
+including webhook mode, CI, logging, retention, containerization, cleanup
+scheduling, benchmark tooling/reporting/CSV export) is already implemented
+and tested end-to-end.
 

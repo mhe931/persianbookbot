@@ -33,7 +33,7 @@ $env:PYTHONPATH = "$PWD\src"
 
 (`pyproject.toml` sets `pythonpath = ["src"]` for pytest, so plain
 `pytest tests/` from the repo root also works once the venv is active.)
-As of this writing the suite has **108 passing tests** and requires no
+As of this writing the suite has **125 passing tests** and requires no
 network access, real Telegram token, or real OCR backend — the default
 `DummyOCREngine` is fully deterministic and offline. The suite is also
 **hermetic against an ambient local `.env` file**: `tests/conftest.py`
@@ -64,14 +64,17 @@ than a new tool being force-added), and runs `pytest tests/` with
   text helpers (`rtl.py`), and the async orchestrator (`pipeline.py`).
 - `src/converters/` — `write_txt`, `write_docx`, `write_epub` (all
   `Book -> pathlib.Path`), plus Persian font configuration (`fonts.py`).
-- `src/bot/` — env-driven config (`config.py`), structured logging
-  (`logging_config.py`), async job orchestration (`jobs.py`, including
-  `JobManager.cleanup_stale_jobs()` retention hooks), Telegram handlers
-  (`telegram_handlers.py`), FastAPI Mini App backend (`api.py`, including
-  `GET /api/health`), and the process entrypoint (`main.py`, including
-  `periodic_cleanup_worker()` — a configurable hourly-by-default background
-  task that calls `default_job_manager.cleanup_stale_jobs()` for the
-  lifetime of the process, cancelled cleanly on shutdown).
+- `src/bot/` — env-driven config (`config.py`, including `webhook_url`/
+  `webhook_secret`), structured logging (`logging_config.py`), async job
+  orchestration (`jobs.py`, including `JobManager.cleanup_stale_jobs()`
+  retention hooks), Telegram handlers (`telegram_handlers.py`), FastAPI
+  Mini App backend (`api.py`, including `GET /api/health` and the
+  `POST /api/telegram/webhook` route), and the process entrypoint
+  (`main.py`, including `periodic_cleanup_worker()` — a configurable
+  hourly-by-default background task that calls
+  `default_job_manager.cleanup_stale_jobs()` for the lifetime of the
+  process, cancelled cleanly on shutdown — and the polling/webhook/
+  API-only mode-selection logic described below).
 - `web/` — static Telegram Mini App frontend (vanilla HTML/CSS/JS):
   Telegram theme CSS variables, RTL/Persian typography, a five-step
   progress indicator, format-selection toggles, download cards with
@@ -80,14 +83,50 @@ than a new tool being force-added), and runs `pytest tests/` with
 - `tools/evaluate_sample.py` — offline-safe local CLI that runs a single
   PDF through the real pipeline/converters (`dummy`/`tesseract`/`paddle`/
   `vision_llm` engine selection) and reports runtime/page/character/output
-  metrics; never required for `pytest tests/` and never requires network
-  access with the default `dummy` engine.
+  metrics as human-readable text (default), `--json`, or `--csv` (single
+  header+data row, spreadsheet-friendly, mutually exclusive with `--json`);
+  never required for `pytest tests/` and never requires network access
+  with the default `dummy` engine.
 - `tests/` — pytest suite covering pipeline, converters, bot/API, the
   Mini App static assets, the evaluation CLI, and integration, using
   generated/dummy fixtures only.
 - `Dockerfile` / `docker-compose.yml` / `.dockerignore` — multi-stage,
   non-root (UID/GID 1000) container build and compose orchestration for
   deployment; see "Containerization / deployment" below.
+
+## Webhook mode
+
+- **Polling is the default and remains so whenever `WEBHOOK_URL` is
+  unset** — `bot.main.main()` picks between three mutually exclusive run
+  paths (`_run_polling_mode`, `_run_webhook_mode`, `_run_api_only_mode`)
+  based only on whether `Settings.bot_token`/`Settings.webhook_url` are
+  set; never call `Application.run_polling()` and start the webhook route
+  at the same time for the same bot (Telegram itself rejects concurrent
+  polling + webhook with a 409 `terminated by other getUpdates request`
+  error).
+- `Settings.webhook_secret` (`src/bot/config.py`) must be set alongside
+  `webhook_url` to actually accept webhook traffic. The route
+  (`POST /api/telegram/webhook`, `src/bot/api.py`) validates the
+  `X-Telegram-Bot-Api-Secret-Token` header **before** touching the request
+  body: a missing header is `401`, and a present-but-wrong (or
+  unconfigured) secret is `403`. The secret value is never logged, echoed
+  back, or exposed by any response.
+- The webhook route is registered unconditionally on the shared
+  `bot.api.app` (so it is always importable/testable), but only dispatches
+  updates when `app.state.telegram_application` has been set to a real,
+  initialized `telegram.ext.Application` — `_run_webhook_mode` wires this
+  in and calls `application.initialize()`/`.start()` before serving, and
+  `.stop()`/`.shutdown()` on server exit. In polling/API-only mode this
+  stays `None` and the route responds `503` instead of ever attempting to
+  process an update.
+- Reverse-proxy deployments (nginx/Caddy/Traefik terminating TLS in front
+  of `API_HOST:API_PORT`) are the intended way to expose the webhook
+  route publicly; see README.md "Webhook mode" for the setup walkthrough.
+  No live Telegram webhook registration or reverse-proxy validation was
+  performed for this change — no `BOT_TOKEN`, public HTTPS endpoint, or
+  Docker engine was available in this environment (see
+  `docs/PROJECT_STATUS.md`) — only offline secret-validation/dispatch
+  behavior was exercised.
 
 ## Containerization / deployment
 
