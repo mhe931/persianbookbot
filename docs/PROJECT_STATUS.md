@@ -2,14 +2,17 @@
 
 _Last updated: 2026-09-14_
 
-## Current milestone: Core pipeline scaffold verified
+## Current milestone: Production OCR backends added
 
-The Persian PDF -> EPUB/DOCX/TXT bot pipeline has been implemented and
-verified end-to-end on branch `feature/bot-core-pipeline`:
+`PaddleOCREngine` and `VisionLLMOCREngine` (Gemini/Claude) have been added
+to `src/ocr/engine.py` behind the existing `OCREngine` abstraction on
+branch `feature/production-ocr-backends`, alongside the previously
+verified core pipeline scaffold:
 
 - PDF rendering + grayscale/deskew preprocessing (`src/ocr/preprocessing.py`)
 - Pluggable OCR engine abstraction with a deterministic offline default
-  (`src/ocr/engine.py`: `DummyOCREngine`, optional `TesseractOCREngine`)
+  (`src/ocr/engine.py`: `DummyOCREngine`, optional `TesseractOCREngine`,
+  `PaddleOCREngine`, `VisionLLMOCREngine`)
 - Async pipeline orchestrator with rate-limit retry/backoff
   (`src/ocr/pipeline.py`)
 - Persian RTL/BiDi text helpers (`src/ocr/rtl.py`)
@@ -25,9 +28,13 @@ verified end-to-end on branch `feature/bot-core-pipeline`:
 
 ## Test status
 
-**46 tests passing**, 0 failing, across:
+**71 tests passing**, 0 failing, across:
 
 - `tests/test_ocr_pipeline.py` — rendering, deskew, OCR abstraction, retry/backoff
+- `tests/test_ocr_production_engines.py` — `PaddleOCREngine`/`VisionLLMOCREngine`
+  factory registration, response mapping, provider error/rate-limit
+  mapping, and retry/backoff, all with `paddleocr`/`httpx` mocked at the
+  module boundary
 - `tests/test_converters.py` — TXT/DOCX/EPUB output and RTL directionality
 - `tests/test_bot_config.py` — settings loading/defaults
 - `tests/test_bot_jobs.py` — job lifecycle and status transitions
@@ -44,7 +51,7 @@ $env:PYTHONPATH = "$PWD\src"
 
 The suite requires **no** real Telegram bot token, OCR credentials, or
 network access — everything runs against the deterministic `DummyOCREngine`
-and mocked Telegram/HTTP clients.
+and mocked Telegram/HTTP/PaddleOCR clients.
 
 ## Known limitations
 
@@ -53,10 +60,19 @@ and mocked Telegram/HTTP clients.
   page (`متن نمونه صفحه {page_number}`) rather than real recognized text.
   This is intentional for offline/credential-free CI and local development,
   but means the bot does **not** yet produce real OCR output out of the box.
-  A real backend (`OCR_ENGINE=tesseract`, structurally implemented in
-  `TesseractOCREngine`) requires `pytesseract` + the Tesseract binary with
-  Persian (`fas`) language data installed, and has not been validated
-  against real scanned books yet.
+  Three real backends exist behind the same `OCREngine` interface:
+  - `OCR_ENGINE=tesseract` (`TesseractOCREngine`) requires `pytesseract` +
+    the Tesseract binary with Persian (`fas`) language data installed.
+  - `OCR_ENGINE=paddle` (`PaddleOCREngine`) requires the optional `paddle`
+    extra (`pip install .[paddle]`, i.e. `paddleocr` + `paddlepaddle`);
+    falls back from `PADDLE_LANG=fa` to Arabic-script (`ar`) recognition if
+    the requested language model is unavailable.
+  - `OCR_ENGINE=vision_llm` (`VisionLLMOCREngine`) prompts a vision-capable
+    LLM (Gemini or Claude, selected via `VISION_LLM_PROVIDER`) to transcribe
+    each page image over HTTP; requires the optional `vision-llm` extra
+    (`pip install .[vision-llm]`, i.e. `httpx`) and a real `VISION_LLM_API_KEY`.
+  None of these three has been validated against real scanned books yet
+  (structurally implemented and unit-tested with mocks only).
 - No real Telegram bot token has been exercised end-to-end (the bot only
   runs in polling mode if `BOT_TOKEN` is set; this has been unit-tested
   with mocks, not live-tested against the Telegram API).

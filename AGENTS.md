@@ -33,7 +33,7 @@ $env:PYTHONPATH = "$PWD\src"
 
 (`pyproject.toml` sets `pythonpath = ["src"]` for pytest, so plain
 `pytest tests/` from the repo root also works once the venv is active.)
-As of this writing the suite has **46 passing tests** and requires no
+As of this writing the suite has **71 passing tests** and requires no
 network access, real Telegram token, or real OCR backend — the default
 `DummyOCREngine` is fully deterministic and offline.
 
@@ -44,8 +44,8 @@ network access, real Telegram token, or real OCR backend — the default
   only these; never introduce parallel/duplicate models.
 - `src/ocr/` — PDF rendering/deskew (`preprocessing.py`), OCR engine
   abstraction (`engine.py`, `DummyOCREngine` default / optional
-  `TesseractOCREngine`), RTL/BiDi text helpers (`rtl.py`), and the async
-  orchestrator (`pipeline.py`).
+  `TesseractOCREngine`, `PaddleOCREngine`, `VisionLLMOCREngine`), RTL/BiDi
+  text helpers (`rtl.py`), and the async orchestrator (`pipeline.py`).
 - `src/converters/` — `write_txt`, `write_docx`, `write_epub` (all
   `Book -> pathlib.Path`), plus Persian font configuration (`fonts.py`).
 - `src/bot/` — env-driven config (`config.py`), async job orchestration

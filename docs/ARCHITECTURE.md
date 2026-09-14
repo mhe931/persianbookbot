@@ -45,9 +45,16 @@ in `src/common/models.py` — no subsystem defines a parallel model.
   offline — it returns fixed placeholder Persian text keyed only by page
   number, requiring zero credentials or network access. `TesseractOCREngine`
   (`OCR_ENGINE=tesseract`) wraps `pytesseract` and fails clearly with a
-  clear `OCRError` if `pytesseract`/Tesseract isn't installed. `RateLimitError`
-  signals a backend is throttling. `get_ocr_engine(name)` is the factory,
-  driven by the `OCR_ENGINE` env var by default.
+  clear `OCRError` if `pytesseract`/Tesseract isn't installed. `PaddleOCREngine`
+  (`OCR_ENGINE=paddle`) lazily wraps the optional `paddleocr` package
+  (`pip install .[paddle]`), with `PADDLE_LANG`/`PADDLE_USE_GPU` config and
+  automatic `fa` -> `ar` fallback. `VisionLLMOCREngine` (`OCR_ENGINE=vision_llm`)
+  prompts Gemini or Claude over provider-neutral HTTP (lazily imported
+  `httpx`, `pip install .[vision-llm]`) using `VISION_LLM_PROVIDER`/
+  `VISION_LLM_API_KEY`/`VISION_LLM_MODEL`. `RateLimitError` signals a
+  backend is throttling (mapped from provider HTTP 429 responses for
+  `VisionLLMOCREngine`). `get_ocr_engine(name)` is the factory, driven by
+  the `OCR_ENGINE` env var by default.
 - `rtl.py`: Two distinct RTL concerns — `shape_rtl()` (visual reshape +
   bidi-reorder, for contexts with no bidi engine of their own, e.g. image
   rendering) vs. `assemble_rtl_paragraph()` (logical/reading order preserved,
@@ -95,10 +102,12 @@ Static vanilla HTML/CSS/JS (`index.html`, `app.js`, `style.css`) that talks
 to the `/api/*` endpoints above; served directly by the FastAPI app.
 
 ### `tests/`
-Pytest suite (46 tests) covering rendering/deskew, the OCR abstraction and
-retry/backoff, converters' RTL output, bot config, job lifecycle, Telegram
-handler retry behavior, the Mini App API, and a full integration flow — all
-against generated/dummy fixtures, no real PDFs/tokens/network.
+Pytest suite (71 tests) covering rendering/deskew, the OCR abstraction and
+retry/backoff, `PaddleOCREngine`/`VisionLLMOCREngine` mapping and
+error/rate-limit handling (mocked), converters' RTL output, bot config, job
+lifecycle, Telegram handler retry behavior, the Mini App API, and a full
+integration flow — all against generated/dummy fixtures, no real
+PDFs/tokens/network.
 
 ## Design principles
 
