@@ -118,21 +118,64 @@ Still open for a follow-up operations iteration:
   boundaries in `AGENTS.md`); persisting it across restarts is explicitly
   out of scope unless a future milestone changes that requirement.
 
-## Milestone 4 — Deployment
+## Milestone 4 — Deployment ✅ (Docker/compose + periodic cleanup scheduling)
 
-- Containerize the API/bot process (`src/bot/main.py`) for reproducible
-  deployment.
-- Define hosting/runtime requirements (persistent `UPLOAD_DIR`/`OUTPUT_DIR`,
-  webhook vs. polling mode via `WEBHOOK_URL`).
-- Out of scope for the current documentation-and-lifecycle milestone; see
-  `AGENTS.md` scope boundaries.
+Delivered on branch `feature/containerization-deployment`:
+
+- ✅ Multi-stage `Dockerfile` (repo root): `builder` stage installs
+  `requirements.txt` into a venv (with a C toolchain available for
+  source-only dependencies); `runtime` stage is a slim `python:3.11-slim`
+  layer containing only that venv plus `src/`/`web/`, the runtime system
+  libraries Pillow/PyMuPDF need (JPEG/PNG/JP2/TIFF codecs, font
+  discovery), and optional `tesseract-ocr`/`tesseract-ocr-fas` so
+  `OCR_ENGINE=tesseract` works without further setup. Runs as a fixed
+  non-root user (`app`, UID/GID 1000), owns `/app/data/uploads` and
+  `/app/data/output` (`chmod 750`), ships safe credential-free environment
+  defaults, and declares a `HEALTHCHECK` against `GET /api/health`.
+- ✅ `docker-compose.yml`: single `bot` service, port `8000` published,
+  `./data:/app/data` persistent bind mount, `env_file: .env` for runtime
+  secret/config injection (never baked into the image), `restart:
+  unless-stopped`, matching `healthcheck:` block.
+- ✅ `.dockerignore` excluding VCS files, `.venv`, caches, `tests/`, `.env`/
+  `.env.*` (keeping `.env.example`), bytecode, and the runtime `data/`
+  directory.
+- ✅ `src/bot/main.py::periodic_cleanup_worker()` — a configurable
+  `asyncio` loop (`Settings.cleanup_interval_seconds`, default 3600s/1h)
+  that calls `default_job_manager.cleanup_stale_jobs()` for the lifetime
+  of the process, wired into both the Telegram-polling path
+  (`Application.post_init`/`post_shutdown`) and the API-only path (a
+  `finally`-guarded task), with explicit cancellation on shutdown in both.
+  Requires no credentials; disabled entirely when
+  `cleanup_interval_seconds <= 0`.
+- ✅ README/AGENTS/bot instructions/project status updated with Docker
+  build/run/compose commands, volume/permission notes, healthcheck usage,
+  runtime env injection, and cleanup-scheduling documentation.
+
+Still open for a follow-up deployment iteration:
+
+- **Build and run the image against a real Docker engine.** No Docker
+  engine was available in the environment this milestone was authored in,
+  so validation was static only (Dockerfile instruction parsing,
+  `docker-compose.yml` YAML/schema inspection). Actually building the
+  image, running `docker compose up`, and exercising the `HEALTHCHECK`/
+  volume ownership end-to-end is the highest-priority remaining item.
+- Consider a `.dockerignore`/build-context size audit and multi-arch
+  (`linux/amd64` + `linux/arm64`) build once a real engine is available.
+- Define hosting/runtime requirements for `WEBHOOK_URL` (webhook mode)
+  vs. polling mode behind a reverse proxy/TLS terminator, if a specific
+  hosting target is chosen.
+- Consider publishing the built image to a container registry (GHCR or
+  similar) via CI, once that is explicitly requested and a registry/
+  credential story is defined — out of scope for this milestone by design.
 
 ## Prioritization notes
 
-With Milestone 3 (operations hardening/CI) now delivered, the highest-value
-next steps are: (1) live-validating the real OCR backends and Telegram bot
-polling path against real data/credentials in a controlled environment
-(the remaining open item from Milestones 1 and 3), and (2) Milestone 4
-(deployment/containerization) once that validation work is scheduled —
-everything else (converters, job orchestration, delivery surfaces, CI,
-logging, retention) is already implemented and tested end-to-end.
+With Milestones 3 and 4 delivered, the highest-value next steps are: (1)
+building/running the container image against a real Docker engine and
+exercising the healthcheck/volume behavior end-to-end (the remaining open
+item from Milestone 4), and (2) live-validating the real OCR backends and
+Telegram bot polling path against real data/credentials in a controlled
+environment (the remaining open item from Milestones 1 and 3) — everything
+else (converters, job orchestration, delivery surfaces, CI, logging,
+retention, containerization, cleanup scheduling) is already implemented
+and tested end-to-end.

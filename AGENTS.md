@@ -33,7 +33,7 @@ $env:PYTHONPATH = "$PWD\src"
 
 (`pyproject.toml` sets `pythonpath = ["src"]` for pytest, so plain
 `pytest tests/` from the repo root also works once the venv is active.)
-As of this writing the suite has **101 passing tests** and requires no
+As of this writing the suite has **108 passing tests** and requires no
 network access, real Telegram token, or real OCR backend — the default
 `DummyOCREngine` is fully deterministic and offline. The suite is also
 **hermetic against an ambient local `.env` file**: `tests/conftest.py`
@@ -68,7 +68,10 @@ than a new tool being force-added), and runs `pytest tests/` with
   (`logging_config.py`), async job orchestration (`jobs.py`, including
   `JobManager.cleanup_stale_jobs()` retention hooks), Telegram handlers
   (`telegram_handlers.py`), FastAPI Mini App backend (`api.py`, including
-  `GET /api/health`), and the process entrypoint (`main.py`).
+  `GET /api/health`), and the process entrypoint (`main.py`, including
+  `periodic_cleanup_worker()` — a configurable hourly-by-default background
+  task that calls `default_job_manager.cleanup_stale_jobs()` for the
+  lifetime of the process, cancelled cleanly on shutdown).
 - `web/` — static Telegram Mini App frontend (vanilla HTML/CSS/JS):
   Telegram theme CSS variables, RTL/Persian typography, a five-step
   progress indicator, format-selection toggles, download cards with
@@ -82,6 +85,45 @@ than a new tool being force-added), and runs `pytest tests/` with
 - `tests/` — pytest suite covering pipeline, converters, bot/API, the
   Mini App static assets, the evaluation CLI, and integration, using
   generated/dummy fixtures only.
+- `Dockerfile` / `docker-compose.yml` / `.dockerignore` — multi-stage,
+  non-root (UID/GID 1000) container build and compose orchestration for
+  deployment; see "Containerization / deployment" below.
+
+## Containerization / deployment
+
+- `Dockerfile` is a two-stage build: a `builder` stage installs Python
+  dependencies from `requirements.txt` into a venv (with a C toolchain
+  available for source-only dependencies), and a slim `runtime` stage
+  copies only that venv plus `src/`/`web/` — no build toolchain ships in
+  the final image.
+- The runtime image always runs as a non-root `app` user with fixed
+  `UID=GID=1000` (never `root`), so bind-mounted `./data` directories can
+  be given matching host ownership. `/app/data/uploads` and
+  `/app/data/output` are created and `chown`ed to `app:app` (`chmod 750`)
+  in the image; `docker-compose.yml` bind-mounts `./data:/app/data` so job
+  files persist across container restarts/rebuilds.
+- `GET /api/health` (see `src/bot/api.py`) is wired as both the Docker
+  `HEALTHCHECK` and the compose service `healthcheck:` — keep it
+  dependency-free (see the contract note in
+  `.github/instructions/bot.instructions.md`) since the container/
+  orchestrator liveness probe depends on it staying fast and reliable.
+- Runtime configuration/secrets (`BOT_TOKEN`, `VISION_LLM_API_KEY`, ...)
+  are **only** ever injected at container run time via
+  `docker-compose.yml`'s `env_file: .env` (or `docker run --env-file .env`)
+  — never baked into the `Dockerfile`/image. `.env` is excluded from the
+  Docker build context by `.dockerignore` alongside `.git`, `.venv`,
+  `.pytest_cache`, `tests/`, bytecode, and the runtime `data/` directory.
+  Never commit a real `.env`; use `.env.example` as the source of truth for
+  which variables exist.
+- `src/bot/main.py::periodic_cleanup_worker()` runs
+  `default_job_manager.cleanup_stale_jobs()` on a configurable interval
+  (`Settings.cleanup_interval_seconds`, default 3600s/1h) for the lifetime
+  of the process (wired into both the Telegram-polling and API-only run
+  paths in `main()`), and is explicitly cancelled/awaited during shutdown
+  (`post_shutdown` for the Telegram path, a `finally` block for the
+  API-only path) so no cleanup sweep is left dangling. It requires no
+  credentials and is disabled (returns immediately) when
+  `cleanup_interval_seconds <= 0`.
 
 ## Git conventions
 

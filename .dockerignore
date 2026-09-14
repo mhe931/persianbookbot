@@ -1,0 +1,45 @@
+# Version control
+.git
+.gitignore
+.github
+
+# Local virtualenvs
+.venv
+venv
+env
+ENV
+
+# Python caches / bytecode
+__pycache__
+*.py[cod]
+*$py.class
+.pytest_cache
+.mypy_cache
+.ruff_cache
+
+# Tests (not needed in the runtime image)
+tests
+
+# Secrets / local environment
+.env
+.env.*
+!.env.example
+
+# Runtime data (uploaded PDFs / generated output) - mounted at runtime via
+# the ./data:/app/data volume instead of being baked into the image.
+data
+
+# Editor / OS cruft
+.vscode
+.idea
+*.log
+.DS_Store
+
+# Docs and misc project-management files not needed inside the image
+docs
+.goals
+*.md
+
+# Docker files themselves don't need to be in the build context contents
+Dockerfile
+docker-compose.yml

@@ -1,10 +1,55 @@
 # Project Status
 
-_Last updated: 2026-09-14_
+_Last updated: 2026-09-14 (containerization & deployment milestone)_
 
-## Current milestone: Operations hardening, CI/CD, and hermetic tests
+## Current milestone: Containerization, deployment readiness, and periodic cleanup scheduling
 
-Milestone 3 (`docs/ROADMAP.md`) has been delivered on branch
+Milestone 4 (`docs/ROADMAP.md`) has been delivered on branch
+`feature/containerization-deployment`: a production-ready multi-stage
+`Dockerfile`, `docker-compose.yml` orchestration, a `.dockerignore`, and a
+configurable periodic cleanup scheduler wired into `bot.main`, on top of
+the previously delivered Milestone 3 operations hardening (CI, structured
+logging, retention hooks, `GET /api/health`):
+
+- **`Dockerfile`** (repo root): two-stage build (`builder` installs
+  `requirements.txt` into a venv with a C toolchain available;
+  `runtime` is a slim `python:3.11-slim` layer with only the venv, app
+  source, and the runtime system libraries actually needed — JPEG/PNG/
+  JP2/TIFF codecs and font discovery for Pillow/PyMuPDF, plus optional
+  `tesseract-ocr`/`tesseract-ocr-fas` so `OCR_ENGINE=tesseract` works out
+  of the box). Runs as a fixed non-root user (`app`, UID/GID 1000),
+  creates/owns `/app/data/uploads` and `/app/data/output`
+  (`chown app:app`, `chmod 750`), sets safe credential-free environment
+  defaults (mirroring `Settings` defaults; `BOT_TOKEN`/
+  `VISION_LLM_API_KEY` are never set in the image), and declares a
+  `HEALTHCHECK` against `GET /api/health`.
+- **`docker-compose.yml`**: single `bot` service, port `8000` published,
+  `./data:/app/data` persistent bind mount, `env_file: .env` for runtime
+  secret/config injection (never baked into the image or committed),
+  `restart: unless-stopped`, and a matching `healthcheck:` block.
+- **`.dockerignore`**: excludes `.git`, `.venv`, `.pytest_cache`, `tests/`,
+  `.env`/`.env.*` (keeping `.env.example`), bytecode caches, and the
+  runtime `data/` directory from the build context.
+- **Periodic cleanup scheduler** (`src/bot/main.py::periodic_cleanup_worker`):
+  an `asyncio` loop that calls `default_job_manager.cleanup_stale_jobs()`
+  every `Settings.cleanup_interval_seconds` (new setting, default 3600s/1h)
+  for the lifetime of the process. Wired into both `main()` run paths —
+  the Telegram-polling path via `Application.post_init`/`post_shutdown`
+  hooks, and the API-only path via a `finally`-guarded task cancellation —
+  so the worker is always cancelled/awaited cleanly on shutdown. Requires
+  no credentials and is disabled (returns immediately, no cleanup ever
+  runs) when `cleanup_interval_seconds <= 0`.
+- **Docker/compose validation**: no Docker engine was available in the
+  build/verification environment for this milestone, so validation was
+  static: the `Dockerfile` was parsed instruction-by-instruction (stage
+  names, valid instruction keywords, line-continuation handling) and
+  `docker-compose.yml` was parsed with `yaml.safe_load` and inspected for
+  the expected `services.bot.{build,ports,volumes,env_file,restart,
+  healthcheck}` keys — both passed. **No image has been built or run**;
+  build/run validation against a real Docker engine remains an open
+  follow-up (see `docs/ROADMAP.md`).
+
+Milestone 3 (`docs/ROADMAP.md`) was delivered on branch
 `feature/operations-hardening`: a GitHub Actions CI workflow, structured
 logging, configurable `JobManager` retention/cleanup hooks, a `GET
 /api/health` liveness endpoint, and a fix making the test suite hermetic
@@ -90,7 +135,15 @@ and Mini App:
 
 ## Test status
 
-**101 tests passing**, 0 failing, across:
+**108 tests passing**, 0 failing, across:
+
+- `tests/test_bot_main_scheduler.py` — **new**: `periodic_cleanup_worker()`
+  behavior (disabled when `cleanup_interval_seconds <= 0`, runs
+  `cleanup_stale_jobs()` on each tick, stops cleanly via a stop event,
+  survives per-sweep errors without dying, and is cleanly cancellable) plus
+  `Settings.cleanup_interval_seconds` default/env-override coverage — all
+  using a fake in-memory job manager and short/zero intervals, no network
+  or Docker dependency
 
 - `tests/test_ocr_pipeline.py` — rendering, deskew, OCR abstraction, retry/backoff
 - `tests/test_ocr_production_engines.py` — `PaddleOCREngine`/`VisionLLMOCREngine`
@@ -179,9 +232,12 @@ checked into the repository.
 - No font binaries are bundled; `PERSIAN_FONT_NAME` is an optional hook and
   falls back to a generic font family if unset — licensing of any real
   Persian font is left to the deployer.
-- CI (`.github/workflows/ci.yml`) now exists; containerization/hosting
-  deployment infrastructure is still out of scope (see Milestone 4 in
-  `docs/ROADMAP.md`).
+- **Docker image has not been built/run against a real Docker engine** —
+  the environment used to author Milestone 4 had no Docker installed, so
+  the `Dockerfile`/`docker-compose.yml` were validated statically (see
+  above) only. Building and running the image (and exercising the
+  `HEALTHCHECK`/volume ownership end-to-end) against a real engine is the
+  key open follow-up.
 - `JobManager` remains **in-memory only** — `cleanup_stale_jobs()` prunes
   stale entries/files but does not persist state across process restarts;
   a durable/multi-process job store remains out of scope by design (see
@@ -199,11 +255,24 @@ checked into the repository.
 - ✅ Local sample-evaluation CLI (`tools/evaluate_sample.py`) available for
   manually validating any of the four OCR engines against a real PDF,
   without requiring network/credentials for the default `dummy` engine.
+- ✅ CI (`.github/workflows/ci.yml`) runs `pytest tests/` on every push/PR
+  targeting `main` across a Python 3.10/3.11/3.12 matrix, no credentials
+  required.
+- ✅ Containerized deployment: multi-stage `Dockerfile` (non-root UID/GID
+  1000, `/api/health` `HEALTHCHECK`) + `docker-compose.yml` (persistent
+  `./data` volume, `env_file: .env` runtime injection, `restart:
+  unless-stopped`) + `.dockerignore`; validated statically (no Docker
+  engine available in this environment — see "Known limitations").
+- ✅ Periodic in-process cleanup: `bot.main.periodic_cleanup_worker()`
+  invokes `default_job_manager.cleanup_stale_jobs()` hourly by default
+  (`Settings.cleanup_interval_seconds`), with clean cancellation on
+  shutdown.
 - ⚠️ Real Persian OCR output requires switching `OCR_ENGINE` to a real
   backend and validating it against real scans (tracked in
   `docs/ROADMAP.md`).
-- ⚠️ No CI workflow file exists yet in `.github/workflows/`; `pytest tests/`
-  must currently be run manually before merging.
+- ⚠️ The container image itself has not been built/run — build/run
+  validation against a real Docker engine is the key remaining deployment
+  follow-up.
 
 ## Links
 
