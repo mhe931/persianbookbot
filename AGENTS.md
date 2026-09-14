@@ -13,8 +13,11 @@ A Telegram bot + Mini App that converts scanned Persian PDF books into
 Scanned PDF -> render -> deskew -> OCR -> RTL assemble -> EPUB/DOCX/TXT -> Bot/API
 ```
 
-See `docs/ARCHITECTURE.md` for the full breakdown and `docs/PROJECT_STATUS.md`
-for current milestone status.
+See `docs/ARCHITECTURE.md` for the full breakdown, `docs/PROJECT_STATUS.md`
+for current milestone status, and `docs/PRODUCTION_READINESS.md` for the
+Milestone 8 production-readiness audit (architecture/security/deployment
+review, static behavioral audit, test/Git-hygiene verification, and an
+honest list of what still requires live infrastructure to validate).
 
 ## Setup
 
@@ -240,6 +243,27 @@ placeholder that returns fixed Persian text per page number. It is
 intentional (keeps tests/CI credential-free) but means no real text is
 recognized yet; see `docs/PROJECT_STATUS.md` and `docs/ROADMAP.md` for the
 plan to add a real OCR backend.
+
+## Production-readiness audit (Milestone 8)
+
+`docs/PRODUCTION_READINESS.md` is the canonical, source-anchored audit
+report — read it before any operational-maintenance handoff or a first
+live deployment attempt:
+
+- It re-verifies (rather than changes) every invariant already documented
+  in this file: credential-free defaults, `.env` git-ignore hygiene,
+  webhook secret-validation ordering, polling/webhook mutual exclusivity,
+  and the deployment bundle's coherence.
+- It re-ran `pytest tests/` (157 passed, 0 failed, fully offline) and a
+  Git/secret-hygiene sweep (no tracked secrets, keys, certificates, PDFs,
+  or generated runtime artifacts) as of the audit date.
+- It documents, rather than works around, the same live-infrastructure
+  gap every prior milestone has recorded: no Docker engine, VPS/DNS
+  record, TLS issuance, or real Telegram/OCR-provider credential was
+  available, so no live `docker compose up`, TLS issuance, or real
+  webhook/OCR call has ever been exercised in this environment. Do not
+  claim any of those as validated without actually running them and
+  updating that document.
 
 ## Live validation / benchmarking (Milestone 5)
 

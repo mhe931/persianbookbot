@@ -196,6 +196,19 @@ This bundle is statically validated (`tests/test_deploy_configs.py`) but
 — see the guide's status note and `docs/PROJECT_STATUS.md` for exactly
 what remains unverified.
 
+## Production readiness
+
+[`docs/PRODUCTION_READINESS.md`](docs/PRODUCTION_READINESS.md) is the
+authoritative Milestone 8 audit report: architecture, interfaces/
+dependencies, a security/credential-handling review, a static behavioral
+audit (RTL/BiDi, OCR error mapping, webhook exclusivity/secret validation,
+health/cleanup, Mini App upload handling, Docker/Compose/Nginx coherence),
+full test/Git-hygiene verification, a deployment pre-flight checklist, and
+an honest list of what still requires live infrastructure (Docker engine,
+VPS/DNS, TLS, and real Telegram/OCR-provider credentials) to validate.
+Read it before a first production deployment attempt or any operational
+maintenance handoff.
+
 See [`docs/agents/AGENT_GUIDE.md`](docs/agents/AGENT_GUIDE.md) for the full
 architecture, subsystem boundaries, and operational runbook.
 
