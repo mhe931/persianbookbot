@@ -1,0 +1,10 @@
+{
+  "goal_id": "git-lifecycle-docs",
+  "status": "building",
+  "iteration": 1,
+  "builder_model": "Claude:Sonnet-4.6",
+  "inspector_model": "Claude:Haiku-4.5",
+  "initial_sha": "5f6a847d0a93fdfb5105d864b2c0754910857943",
+  "created_at": "2026-09-14T12:35:27.872+03:00",
+  "history": []
+}

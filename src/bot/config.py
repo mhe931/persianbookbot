@@ -1,0 +1,71 @@
+"""Application configuration for the bot/Mini App subsystem.
+
+All configuration is loaded from environment variables (optionally via a
+``.env`` file) using ``pydantic-settings``. Nothing here requires a real
+Telegram bot token: ``bot_token`` defaults to ``None`` so importing this
+module, running tests, or running the FastAPI Mini App backend alone never
+needs a credential.
+"""
+from __future__ import annotations
+
+from functools import lru_cache
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    """Runtime configuration, sourced from environment variables / ``.env``."""
+
+    # Telegram bot token from @BotFather. ``None`` disables the bot (API/Mini
+    # App only mode) - safe default so no credential is ever required.
+    bot_token: str | None = None
+
+    # Host/port for the local FastAPI Mini App backend.
+    api_host: str = "0.0.0.0"
+    api_port: int = 8000
+
+    # OCR engine backend: "dummy" (deterministic offline fallback) or "tesseract".
+    ocr_engine: str = "dummy"
+
+    # Directories for generated output artifacts and uploaded PDFs.
+    output_dir: str = "./data/output"
+    upload_dir: str = "./data/uploads"
+
+    # Maximum accepted upload size in megabytes.
+    max_file_size_mb: int = 20
+
+    # Telegram/OCR rate-limit retry policy.
+    rate_limit_max_retries: int = 3
+    rate_limit_backoff_seconds: float = 2.0
+
+    # Optional webhook URL if running the bot in webhook mode instead of polling.
+    webhook_url: str | None = None
+
+    # Optional Persian font family name used by DOCX/EPUB converters.
+    persian_font_name: str | None = None
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_prefix="",
+        case_sensitive=False,
+        extra="ignore",
+    )
+
+
+@lru_cache
+def get_settings() -> Settings:
+    """Return a cached ``Settings`` instance.
+
+    Cached so repeated calls (across handlers/modules) reuse the same
+    parsed configuration instead of re-reading the environment each time.
+    """
+    return Settings()
+
+
+def reset_settings_cache() -> None:
+    """Clear the ``get_settings`` cache.
+
+    Useful for tests that monkeypatch environment variables and need
+    ``get_settings()`` to pick up the new values on the next call.
+    """
+    get_settings.cache_clear()
