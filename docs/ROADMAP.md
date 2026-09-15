@@ -344,18 +344,48 @@ source-anchored, read-only audit of every prior milestone below, producing
   own open items below, since no new infrastructure became available
   between milestones.
 
+## Milestone 9 — Live cloud staging validation attempt ⏸️ (blocked; safe discovery only)
+
+Delivered on branch `feature/live-staging-deployment`: a fresh,
+non-destructive discovery pass for Docker/Compose, WSL, configured Docker
+contexts, SSH targets, and cloud CLI tooling, producing
+`docs/LIVE_STAGING_VALIDATION.md`. **No application code changed.**
+
+- ✅ Confirmed (again, with fresh command output) that this environment
+  has no Docker engine, no WSL, and no `docker-compose`/`docker` binary
+  on `PATH` — `docker context ls` cannot even run.
+- ✅ Discovered two pre-existing SSH host aliases (`~/.ssh/config`) and an
+  authenticated Azure CLI session on this machine, but confirmed neither
+  is a persianbookbot-designated deployment target and correctly left
+  both untouched, per this milestone's explicit "no guessing hosts, no
+  provisioning without configured access" scope boundary.
+- ✅ Confirmed local `.env` presence/git-ignore status and which keys are
+  set, **without reading any secret value** — `BOT_TOKEN` is set for
+  local dev but `WEBHOOK_URL` is empty and no domain/TLS exists, so no
+  live Telegram/webhook call was made.
+- ✅ Re-confirmed UID/GID 1000 Dockerfile/`setup_host.sh` correctness by
+  source read (unchanged from Milestone 5/8).
+- ✅ `pytest tests/` re-verified: **157 passed, 0 failed** — identical
+  count to Milestones 6–8.
+- **Still blocked, same root cause as Milestones 5–8**: no Docker engine,
+  no VPS/DNS/domain designated for this project, no TLS issuance, no real
+  Telegram webhook delivery, and no scanned Persian PDF sample. See
+  `docs/LIVE_STAGING_VALIDATION.md` for the full evidence, the
+  consolidated blocker table, and exact operator unblock commands.
+
 ## Prioritization notes
 
-With Milestones 3, 4, 6, 7, and 8 delivered and Milestone 5
-attempted-but-blocked on environment availability, the highest-value next
-step is unchanged from before this milestone: **get access to a real
+With Milestones 3, 4, 6, 7, and 8 delivered, Milestone 5
+attempted-but-blocked, and Milestone 9 re-attempting the same live-infra
+gap with additional safe discovery (still blocked), the highest-value
+next step is unchanged from before this milestone: **get access to a real
 VPS/cloud host with a Docker engine, a DNS record under your control, and
 a real Telegram bot token**, and run the full `docs/DEPLOYMENT_GUIDE.md`
 walkthrough end-to-end — container smoke test, TLS issuance, and live
 webhook registration/delivery all in one pass, since they all depend on
-the same missing prerequisite (see Milestone 5, Milestone 6, and
-Milestone 7 above for the detailed follow-up lists, and
-`docs/PRODUCTION_READINESS.md` for the consolidated, audited version of
+the same missing prerequisite (see Milestone 5, Milestone 6, Milestone 7,
+and Milestone 9 above for the detailed follow-up lists, and
+`docs/LIVE_STAGING_VALIDATION.md` for the consolidated, audited version of
 the same list) — everything else (converters, job orchestration, delivery
 surfaces including webhook mode, CI, logging, retention, containerization,
 cleanup scheduling, benchmark tooling/reporting/CSV export, and the

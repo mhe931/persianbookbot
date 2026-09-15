@@ -1,8 +1,33 @@
 # Project Status
 
-_Last updated: 2026-09-14 (Milestone 8 production-readiness audit)_
+_Last updated: 2026-09-15 (Milestone 9 live-staging validation attempt)_
 
-## Current milestone: Milestone 8 — Production-readiness audit ✅ (verified; live infra unchanged)
+## Current milestone: Milestone 9 — Live cloud staging validation attempt ⏸️ (blocked; safe discovery only)
+
+Delivered on branch `feature/live-staging-deployment`: a fresh,
+non-destructive discovery pass over Docker/Compose, WSL, configured
+Docker contexts, SSH targets, and cloud CLI tooling, producing the new
+`docs/LIVE_STAGING_VALIDATION.md`. **No application code changed.**
+
+- ✅ New `docs/LIVE_STAGING_VALIDATION.md`: the canonical Milestone 9
+  continuity report — exact commands and output for Docker/Compose/WSL/
+  SSH/cloud-CLI discovery, a key-presence-only `.env` scan (no secret
+  value read or used), a restated TLS/webhook/health-endpoint blocker
+  list with unblock commands, and re-confirmed UID/GID 1000 Dockerfile
+  evidence.
+- ✅ `pytest tests/` re-verified: **157 passed, 0 failed**, fully offline
+  — identical count to Milestones 6–8, since no test was added/removed.
+- **Still blocked, same root cause as Milestones 5–8**: this environment
+  has no Docker engine, no WSL, no persianbookbot-designated Linux host
+  or domain, and no scanned Persian PDF sample. Two unrelated SSH hosts
+  and an authenticated Azure CLI session exist on this machine but are
+  **not** persianbookbot deployment targets and were correctly left
+  untouched per this milestone's scope (no guessing hosts, no
+  provisioning without explicit configured access). See
+  `docs/LIVE_STAGING_VALIDATION.md` for the full, reproducible evidence
+  and the exact operator handoff commands.
+
+## Previous milestone: Milestone 8 — Production-readiness audit ✅ (verified; live infra unchanged)
 
 Delivered on branch `feature/production-readiness-audit`: a full
 source-anchored, read-only audit of all seven prior milestones (core
