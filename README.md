@@ -209,6 +209,16 @@ VPS/DNS, TLS, and real Telegram/OCR-provider credentials) to validate.
 Read it before a first production deployment attempt or any operational
 maintenance handoff.
 
+## Live staging validation
+
+[`docs/LIVE_STAGING_VALIDATION.md`](docs/LIVE_STAGING_VALIDATION.md) is the
+Milestone 9 report on attempting live infrastructure validation: exact
+commands/output for Docker/Compose/WSL/SSH/cloud-CLI discovery, a
+key-presence-only `.env` scan (no secret read or used), and a
+consolidated TLS/webhook/health/OCR-benchmark blocker table with the
+exact operator commands to unblock each item on a real Docker-capable
+Linux host with a domain and Telegram credentials.
+
 See [`docs/agents/AGENT_GUIDE.md`](docs/agents/AGENT_GUIDE.md) for the full
 architecture, subsystem boundaries, and operational runbook.
 
