@@ -1,8 +1,42 @@
 # Project Status
 
-_Last updated: 2026-09-15 (Milestone 9 live-staging validation attempt)_
+_Last updated: 2026-09-15 (Milestone 10 production host validation attempt)_
 
-## Current milestone: Milestone 9 — Live cloud staging validation attempt ⏸️ (blocked; safe discovery only)
+## Current milestone: Milestone 10 — Production host validation attempt ⏸️ (blocked; no Docker host available)
+
+Attempted on branch `feature/production-host-validation`, forked from
+`main` at `41cbd23`: a full re-attempt of Milestone 9's live
+Docker/Compose deployment, health-probe, UID/GID 1000, sample-PDF
+conversion, and metrics-capture procedure. **No application code
+changed; no container was run.**
+
+- ✅ Re-verified (fresh command output, same machine): no Docker Engine,
+  no Docker Compose CLI, no usable WSL Linux distribution (`wsl.exe` is
+  only the launcher stub; the feature itself is not installed), and the
+  only Docker-named Windows service is an unrelated Flexera inventory
+  monitor — none of these is a Docker-capable host.
+- ✅ Re-confirmed the two pre-existing SSH aliases and the authenticated
+  Azure CLI session are unrelated to persianbookbot and were **not**
+  contacted or used, per the explicit "no guessing hosts" scope
+  boundary — identical finding to Milestone 9.
+- ✅ `.env` key-presence (not value) re-scanned: unchanged from Milestone
+  9 (`WEBHOOK_URL` still empty, `OCR_ENGINE` still the credential-free
+  `dummy` default).
+- ✅ `pytest tests/` re-verified: **157 passed, 0 failed**, fully offline
+  — identical count to Milestones 6–9.
+- ✅ Tracked-secret/artifact hygiene re-checked: `git ls-files` has no
+  `.env`/`.pem`/`.key`/`.pdf`/`.crt`; `git status --porcelain` shows only
+  the untracked `.goals/` planning folder.
+- **Blocked — same root cause as Milestones 5, 6, 7, 8, 9**: no Docker
+  Engine or Docker-capable host is available in this authoring
+  environment, so the production Compose stack was not started, `/healthz`
+  and `/api/health` were not probed live, UID/GID 1000 bind-mount
+  behavior was not runtime-exercised, no sample PDF was converted through
+  a live API, and no runtime metrics were captured. See
+  `docs/LIVE_STAGING_VALIDATION.md` ("Milestone 10 re-attempt" section)
+  for the full reproducible evidence and unchanged operator handoff.
+
+## Previous milestone: Milestone 9 — Live cloud staging validation attempt ⏸️ (blocked; safe discovery only)
 
 Delivered on branch `feature/live-staging-deployment`: a fresh,
 non-destructive discovery pass over Docker/Compose, WSL, configured

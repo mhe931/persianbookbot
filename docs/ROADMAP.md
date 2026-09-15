@@ -373,22 +373,58 @@ contexts, SSH targets, and cloud CLI tooling, producing
   `docs/LIVE_STAGING_VALIDATION.md` for the full evidence, the
   consolidated blocker table, and exact operator unblock commands.
 
+## Milestone 10 — Production host validation attempt ⏸️ (blocked; identical root cause)
+
+Attempted on branch `feature/production-host-validation`, forked from
+`main` at `41cbd23`: a full re-attempt of the documented production
+deployment procedure (start `deploy/docker-compose.prod.yml`, probe
+`/healthz`/`/api/health`, verify UID/GID 1000 bind-mount permissions,
+convert a sample PDF through the live API, capture runtime metrics,
+tear down cleanly). **No application code changed; no container was
+started.**
+
+- ✅ Fresh Docker/Compose/WSL/service discovery re-run on the same
+  machine: still no `docker`/`docker-compose` binary, `wsl.exe` is only
+  the Windows launcher stub (WSL feature not installed), and the only
+  Docker-named Windows service is the unrelated `FlexeraDockerMon`
+  inventory agent — none of these is a usable Docker Engine.
+- ✅ Re-confirmed the same two unrelated SSH aliases and authenticated
+  Azure CLI session from Milestone 9 exist but are still not designated
+  persianbookbot targets, and were **not** contacted, per scope.
+- ✅ `.env` key-presence re-scanned (values never read): unchanged from
+  Milestone 9.
+- ✅ `pytest tests/` re-verified: **157 passed, 0 failed** — identical
+  count to Milestones 6–9; no test added/removed/modified.
+- ✅ Tracked-secret/artifact hygiene re-checked: no `.env`/`.pem`/`.key`/
+  `.pdf`/`.crt` tracked in Git; working tree clean apart from the
+  untracked `.goals/` planning folder.
+- **Blocked — every live acceptance item for this milestone (stack
+  start/teardown, live `/healthz`/`/api/health` probe, UID/GID 1000
+  runtime bind-mount check, sample-PDF conversion through a live API,
+  runtime metrics capture) is explicitly marked blocked for the identical
+  root cause as Milestones 5–9**: no Docker Engine or Docker-capable host
+  is available in, or designated for, this authoring environment. See
+  `docs/LIVE_STAGING_VALIDATION.md` ("Milestone 10 re-attempt" section)
+  for full command evidence and the unchanged operator handoff.
+
 ## Prioritization notes
 
 With Milestones 3, 4, 6, 7, and 8 delivered, Milestone 5
-attempted-but-blocked, and Milestone 9 re-attempting the same live-infra
-gap with additional safe discovery (still blocked), the highest-value
-next step is unchanged from before this milestone: **get access to a real
-VPS/cloud host with a Docker engine, a DNS record under your control, and
-a real Telegram bot token**, and run the full `docs/DEPLOYMENT_GUIDE.md`
-walkthrough end-to-end — container smoke test, TLS issuance, and live
-webhook registration/delivery all in one pass, since they all depend on
-the same missing prerequisite (see Milestone 5, Milestone 6, Milestone 7,
-and Milestone 9 above for the detailed follow-up lists, and
-`docs/LIVE_STAGING_VALIDATION.md` for the consolidated, audited version of
-the same list) — everything else (converters, job orchestration, delivery
-surfaces including webhook mode, CI, logging, retention, containerization,
-cleanup scheduling, benchmark tooling/reporting/CSV export, and the
-Nginx/Certbot deployment bundle itself) is already implemented, tested,
-and now independently audited end-to-end.
+attempted-but-blocked, and Milestones 9–10 each re-attempting the same
+live-infra gap with additional safe discovery (still blocked), the
+highest-value next step is unchanged from before these milestones: **get
+access to a real VPS/cloud host with a Docker engine, a DNS record under
+your control, and a real Telegram bot token**, and run the full
+`docs/DEPLOYMENT_GUIDE.md` walkthrough end-to-end — container smoke test,
+TLS issuance, live webhook registration/delivery, and the UID/GID 1000/
+sample-PDF/metrics checks required by Milestone 10 — all in one pass,
+since they all depend on the same missing prerequisite (see Milestone 5,
+Milestone 6, Milestone 7, Milestone 9, and Milestone 10 above for the
+detailed follow-up lists, and `docs/LIVE_STAGING_VALIDATION.md` for the
+consolidated, audited version of the same list) — everything else
+(converters, job orchestration, delivery surfaces including webhook mode,
+CI, logging, retention, containerization, cleanup scheduling, benchmark
+tooling/reporting/CSV export, and the Nginx/Certbot deployment bundle
+itself) is already implemented, tested, and now independently audited
+end-to-end.
 

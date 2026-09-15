@@ -1,10 +1,14 @@
-# Live Staging Validation Report — Milestone 9
+# Live Staging Validation Report — Milestones 9–10
 
 _Audit date: 2026-09-15. Prepared on branch `feature/live-staging-deployment`,
 forked from `main` at commit `868be4c`. This is a read-only prerequisite
 inspection: no application or deployment code was changed to produce this
 report, no secret value was printed or read, no arbitrary host was scanned,
-and no cloud resource was provisioned._
+and no cloud resource was provisioned. Milestone 10 (same date, branch
+`feature/production-host-validation`, forked from `main` at commit
+`41cbd23`) re-ran the same discovery pass and reached the identical
+blocked conclusion — see "Milestone 10 re-attempt" near the end of this
+document._
 
 ## Executive summary
 
@@ -233,6 +237,78 @@ carried-over.
 - This document is the new canonical continuity report for live-staging
   status; `docs/PROJECT_STATUS.md` and `docs/ROADMAP.md` now point here
   for the Milestone 9 entry instead of duplicating the full evidence.
+
+## Milestone 10 re-attempt (2026-09-15, branch `feature/production-host-validation`)
+
+This milestone re-ran the full Milestone 9 discovery/attempt pass on the
+same physical machine, fresh, to check whether any prerequisite had
+become available since Milestone 9. **Conclusion: unchanged — still
+blocked, same root cause.** No production stack was started; no
+container was run; no live endpoint was probed.
+
+```
+> Get-Command docker -ErrorAction SilentlyContinue        # (no output — not found)
+> Get-Command docker-compose -ErrorAction SilentlyContinue # (no output — not found)
+> Get-Command wsl -ErrorAction SilentlyContinue
+CommandType Name    Source
+Application wsl.exe C:\WINDOWS\system32\wsl.exe
+> wsl --status
+The Windows Subsystem for Linux is not installed. You can install by
+running 'wsl.exe --install'.
+> Get-Service -Name "*docker*"
+Status  Name             DisplayName
+------  ----             -----------
+Running FlexeraDockerMon Flexera Inventory Docker Monitor
+```
+
+- **Docker/Compose**: still absent. `wsl.exe` exists as the Windows launcher
+  stub only (present on all modern Windows installs); the WSL *feature*
+  itself is not installed, so it is not a usable Docker host — identical
+  to Milestone 9's finding, re-verified rather than assumed.
+- The only Docker-named service running is `FlexeraDockerMon` (an IT
+  inventory/monitoring agent, not the Docker Engine) — confirmed by
+  `Get-Service`, not treated as a usable engine.
+- **SSH hosts**: `~/.ssh/config` still lists exactly the same two aliases
+  as Milestone 9 (`aml-pulsar-shape`, `acerserver`); neither is referenced
+  anywhere in this repository or `docs/DEPLOYMENT_GUIDE.md` as a
+  persianbookbot target, so — per the explicit scope boundary — **neither
+  was contacted**.
+- **Azure CLI**: `az account show --output none` exits `0` (still
+  authenticated to the operator's personal subscription); no resource
+  group, VM, or DNS zone in it is designated for persianbookbot, so no
+  resource was read further, listed, or provisioned.
+- **`.env`**: same key-presence pattern as Milestone 9 — `BOT_TOKEN`,
+  `API_HOST`, `API_PORT`, `OCR_ENGINE`, `UPLOAD_DIR`, `OUTPUT_DIR`,
+  `MAX_FILE_SIZE_MB`, `RATE_LIMIT_MAX_RETRIES`,
+  `RATE_LIMIT_BACKOFF_SECONDS` are `<SET>`; `WEBHOOK_URL` and
+  `PERSIAN_FONT_NAME` are `<EMPTY>`. `.env` remains `git`-ignored
+  (`git check-ignore -v .env` → `.gitignore:151:.env`). No value read.
+- **Sample PDF**: `Get-ChildItem -Recurse -Include *.pdf` (excluding
+  `.venv`) returns no results — still no scanned Persian PDF sample in
+  the working tree, so the synthetic/sample PDF API conversion step
+  required by this milestone's acceptance criteria could not be run
+  against a live container (there is no container to run it against).
+- **UID/GID 1000**: re-confirmed by source read only (`Dockerfile`,
+  `deploy/setup_host.sh`) — unchanged from Milestones 5/8/9, still not
+  runtime-exercised against a real bind mount.
+- **Offline suite**: re-run this session —
+  `$env:PYTHONPATH="$PWD\src"; .\.venv\Scripts\python.exe -m pytest tests\ -q`
+  → **157 passed, 0 failed, 9 warnings** (identical count to Milestones
+  6–9; no test added, removed, or modified).
+- **Artifact/secret hygiene**: `git ls-files | Select-String -Pattern
+  '\.env$|\.pem$|\.key$|\.pdf$|\.crt$'` → no matches; `git status
+  --porcelain` shows only the untracked `.goals/` planning folder, no
+  staged secret or runtime artifact.
+
+**Net result: identical to Milestone 9.** No new blocker was discovered
+and none was resolved. The seven consolidated blockers above remain
+open, and the health-probe, UID/GID runtime-exercise, PDF-conversion, and
+metrics-capture acceptance items for Milestone 10 are each explicitly
+**blocked** for the same single reason: no Docker Engine (nor any
+Docker-capable WSL/Linux host) is available in this authoring
+environment, and no persianbookbot-designated remote Docker host was
+provided or discovered. Standing up the real host remains an operator
+action — see the handoff below (unchanged from Milestone 9).
 
 ## Operator handoff (unchanged priority order)
 
