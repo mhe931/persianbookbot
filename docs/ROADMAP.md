@@ -407,9 +407,33 @@ started.**
   `docs/LIVE_STAGING_VALIDATION.md` ("Milestone 10 re-attempt" section)
   for full command evidence and the unchanged operator handoff.
 
+## Milestone 11 — Delivery report and operational runbook ✅ (documentation-only finalization)
+
+Delivered on branch `feature/delivery-report-runbook`, forked from `main`
+at `a347df3`: a single, self-contained `docs/DELIVERY_REPORT.md`
+consolidating all ten prior milestones for operator handoff — capability
+matrix, architecture/data flow/shared contracts, local and Docker/
+production deployment quickstarts, polling/webhook configuration, the
+evaluation CLI, the security/secret-management model, full test
+verification, and a prioritized cloud-host/OCR handoff checklist. **No
+application, converter, OCR, or deployment-code logic was changed.**
+
+- ✅ `docs/DELIVERY_REPORT.md` (new) — reconciled against current source
+  and every prior milestone report; no live metric or infrastructure
+  result claimed beyond what is already evidenced.
+- ✅ `pytest tests/` re-verified: **157 passed, 0 failed**, fully
+  offline — identical count to Milestones 6–10.
+- ✅ Git/secret/artifact integrity re-checked across all local refs and
+  tags (none exist): clean.
+- ✅ README.md/`docs/PROJECT_STATUS.md` updated with a pointer to the
+  final report and an explicit development→operations handoff statement.
+- **This roadmap's remaining items are unchanged** by this milestone —
+  see "Prioritization notes" below, now framed as the final operator
+  handoff checklist (also restated in `docs/DELIVERY_REPORT.md` §14).
+
 ## Prioritization notes
 
-With Milestones 3, 4, 6, 7, and 8 delivered, Milestone 5
+With Milestones 3, 4, 6, 7, 8, and 11 delivered, Milestone 5
 attempted-but-blocked, and Milestones 9–10 each re-attempting the same
 live-infra gap with additional safe discovery (still blocked), the
 highest-value next step is unchanged from before these milestones: **get
@@ -420,11 +444,16 @@ TLS issuance, live webhook registration/delivery, and the UID/GID 1000/
 sample-PDF/metrics checks required by Milestone 10 — all in one pass,
 since they all depend on the same missing prerequisite (see Milestone 5,
 Milestone 6, Milestone 7, Milestone 9, and Milestone 10 above for the
-detailed follow-up lists, and `docs/LIVE_STAGING_VALIDATION.md` for the
-consolidated, audited version of the same list) — everything else
-(converters, job orchestration, delivery surfaces including webhook mode,
-CI, logging, retention, containerization, cleanup scheduling, benchmark
-tooling/reporting/CSV export, and the Nginx/Certbot deployment bundle
-itself) is already implemented, tested, and now independently audited
-end-to-end.
+detailed follow-up lists, and `docs/LIVE_STAGING_VALIDATION.md`/
+`docs/DELIVERY_REPORT.md` §14 for the consolidated, audited version of the
+same list) — everything else (converters, job orchestration, delivery
+surfaces including webhook mode, CI, logging, retention, containerization,
+cleanup scheduling, benchmark tooling/reporting/CSV export, the
+Nginx/Certbot deployment bundle, and now the final delivery
+documentation) is already implemented, tested, and independently audited
+end-to-end. **With this milestone, the project transitions from active
+feature development to an operations/live-validation handoff** — no
+further application milestones are planned in this roadmap; all
+subsequent work is executing the checklist above against real
+infrastructure.
 

@@ -1,8 +1,40 @@
 # Project Status
 
-_Last updated: 2026-09-15 (Milestone 10 production host validation attempt)_
+_Last updated: 2026-09-15 (Milestone 11 delivery report and operational runbook)_
 
-## Current milestone: Milestone 10 — Production host validation attempt ⏸️ (blocked; no Docker host available)
+## Current milestone: Milestone 11 — Delivery report and operational runbook ✅ (documentation-only finalization)
+
+Delivered on branch `feature/delivery-report-runbook`, forked from `main`
+at `a347df3` (post–Milestone 10): a single, self-contained
+`docs/DELIVERY_REPORT.md` consolidating all ten prior milestones —
+capability matrix, architecture/data flow/shared contracts, local and
+Docker/production deployment quickstarts, polling/webhook configuration,
+the evaluation CLI, the security/secret-management model, full test
+verification, and a prioritized cloud-host/OCR handoff checklist. **No
+application, converter, OCR, or deployment-code logic was changed.**
+
+- ✅ `docs/DELIVERY_REPORT.md` (new): reconciled against current source,
+  `docs/PROJECT_STATUS.md`, `docs/ROADMAP.md`, `docs/PRODUCTION_READINESS.md`,
+  `docs/LIVE_STAGING_VALIDATION.md`, and `docs/BENCHMARK_RESULTS.md` — no
+  live metric or infrastructure result is claimed beyond what those
+  reports already evidence.
+- ✅ `pytest tests/` re-verified: **157 passed, 0 failed**, fully offline —
+  identical count to Milestones 6–10.
+- ✅ Git/secret/artifact integrity re-checked across all local refs and
+  tags (none exist): no tracked `.env`/`.pem`/`.key`/`.crt`/`.pdf`, no
+  such file ever added in history, no token-shaped literal in any
+  reachable commit, `.env` confirmed git-ignored and untracked.
+- ✅ README.md/`docs/ROADMAP.md` updated with a pointer to the final
+  report and an explicit statement that the project transitions from
+  active feature development to an operations/live-validation handoff —
+  no further application milestones are planned; remaining work is the
+  cloud-host/OCR checklist in `docs/DELIVERY_REPORT.md` §14.
+- **Not live-validated** (unchanged from every prior milestone): this is a
+  documentation-only pass, so the Docker/VPS/TLS/Telegram/OCR-provider
+  constraints restated in `docs/DELIVERY_REPORT.md` §13 remain exactly as
+  they were after Milestone 10.
+
+## Previous milestone: Milestone 10 — Production host validation attempt ⏸️ (blocked; no Docker host available)
 
 Attempted on branch `feature/production-host-validation`, forked from
 `main` at `41cbd23`: a full re-attempt of Milestone 9's live
@@ -563,7 +595,10 @@ guidance for production use.
 
 ## Links
 
+- **Final delivery report (Milestone 11): [`docs/DELIVERY_REPORT.md`](DELIVERY_REPORT.md)**
 - Architecture: [`docs/ARCHITECTURE.md`](ARCHITECTURE.md)
+- Production readiness (Milestone 8): [`docs/PRODUCTION_READINESS.md`](PRODUCTION_READINESS.md)
+- Live staging validation (Milestones 9–10): [`docs/LIVE_STAGING_VALIDATION.md`](LIVE_STAGING_VALIDATION.md)
 - Benchmark results (Milestone 5): [`docs/BENCHMARK_RESULTS.md`](BENCHMARK_RESULTS.md)
 - Deployment guide (Milestone 7): [`docs/DEPLOYMENT_GUIDE.md`](DEPLOYMENT_GUIDE.md)
 - Roadmap: [`docs/ROADMAP.md`](ROADMAP.md)

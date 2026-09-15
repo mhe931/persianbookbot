@@ -219,6 +219,19 @@ consolidated TLS/webhook/health/OCR-benchmark blocker table with the
 exact operator commands to unblock each item on a real Docker-capable
 Linux host with a domain and Telegram credentials.
 
+## Delivery report (final handoff)
+
+[`docs/DELIVERY_REPORT.md`](docs/DELIVERY_REPORT.md) is the Milestone 11
+final delivery report: a single, self-contained summary of all ten prior
+milestones, the capability matrix, architecture/data-flow/shared
+contracts, local and Docker/production deployment quickstarts,
+polling/webhook configuration, the evaluation CLI, the security model, the
+full test-suite verification, and a prioritized cloud-host/OCR handoff
+checklist for the next operator with real infrastructure access. **The
+project is now handed off from active feature development to operations**
+— all further work is live-infrastructure validation against the checklist
+in that report, not new application code.
+
 See [`docs/agents/AGENT_GUIDE.md`](docs/agents/AGENT_GUIDE.md) for the full
 architecture, subsystem boundaries, and operational runbook.
 
