@@ -1,7 +1,7 @@
 {
     "goal_id":  "production-host-validation",
-    "status":  "inspecting",
-    "iteration":  1,
+    "status":  "building",
+    "iteration":  2,
     "builder_model":  "Claude:Sonnet-4.6",
     "inspector_model":  "Claude:Haiku-4.5",
     "initial_sha":  "41cbd2380a67e1aebe7fbbf2cf34df5119137627",
@@ -13,7 +13,7 @@
                         "timestamp":  "2026-09-15T08:38:20+03:00",
                         "result":  "INCOMPLETE",
                         "feedback_file":  "inspector-feedback-1.md",
-                        "summary":  "Inspector scope (Docker discovery, host safety, docs, tests, hygiene) PASS; Goal completion INCOMPLETE (PR/merge workflow not performed)",
+                        "summary":  "Inspector scope (Docker discovery, host safety, docs, tests, hygiene) PASS; Goal completion INCOMPLETE (PR/merge workflow not performed). Only remaining acceptance item is the orchestrator-owned Git lifecycle (push, PR, squash-merge, branch cleanup). No product/runtime-report changes required.",
                         "builder_commit":  "1397658",
                         "role":  "inspector"
                     }
