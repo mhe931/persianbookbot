@@ -1,8 +1,53 @@
 # Project Status
 
-_Last updated: 2026-09-14 (staging deployment infrastructure milestone)_
+_Last updated: 2026-09-14 (Milestone 8 production-readiness audit)_
 
-## Current milestone: Staging infrastructure and cloud deployment playbook
+## Current milestone: Milestone 8 — Production-readiness audit ✅ (verified; live infra unchanged)
+
+Delivered on branch `feature/production-readiness-audit`: a full
+source-anchored, read-only audit of all seven prior milestones (core
+pipeline, production OCR backends, Mini App UI, operations hardening,
+containerization, webhook support, and the staging deployment bundle),
+producing the new `docs/PRODUCTION_READINESS.md` and refreshing this
+continuity documentation set. **No application code changed** — this
+milestone is verification/documentation only.
+
+- ✅ `docs/PRODUCTION_READINESS.md` (new): authoritative production-
+  readiness report — architecture, interfaces/dependencies, a security/
+  credential-handling audit, a per-acceptance-criterion static behavioral
+  audit (RTL/BiDi, converter font hooks, OCR error mapping, polling/
+  webhook exclusivity, webhook secret validation, health/cleanup behavior,
+  Mini App configuration/lifecycle/upload handling, Docker/Compose/Nginx/
+  bootstrap coherence), full test verification, Git/secret-hygiene
+  verification, a deployment pre-flight checklist, and an honest,
+  consolidated statement of what remains live-unvalidated.
+- ✅ **No defects found**: every static-audit item above was verified
+  against the current source and passed; no regression, secret exposure,
+  or coherence gap was identified in `src/`, `web/`, `tools/`, `deploy/`,
+  the root `Dockerfile`/`docker-compose.yml`, or `.github/`.
+- ✅ **Test suite re-verified**: `pytest tests/` — **157 passed, 0
+  failed**, fully offline, zero credentials, matching every prior
+  milestone's own count exactly (no test added or removed by this audit).
+- ✅ **Git/secret hygiene re-verified**: `.env` confirmed git-ignored and
+  untracked; no committed secrets, private keys, certificates, PDFs, or
+  generated runtime artifacts found anywhere in tracked history
+  (`git ls-files`, `git log --all --diff-filter=A`, and `git grep` for
+  token-shaped patterns all came back clean).
+- ✅ README.md/AGENTS.md/`docs/ROADMAP.md` updated with this milestone's
+  findings and a pointer to `docs/PRODUCTION_READINESS.md` for the
+  operational-maintenance handoff.
+- **Not live-validated** (restated, not newly discovered — same
+  environment constraints as every prior milestone): no Docker engine, no
+  VPS/DNS record, no TLS issuance, and no real Telegram/OCR-provider
+  credential were available in this environment, so this audit could not
+  build/run the Docker image, bring up `deploy/docker-compose.prod.yml`
+  against a real domain, or exercise a live Telegram webhook/real OCR
+  call. See `docs/PRODUCTION_READINESS.md`'s "Known operational
+  constraints" section for the full, prioritized list — it is unchanged
+  from Milestone 7's own open items, since no new infrastructure became
+  available between milestones.
+
+## Previous milestone: Staging infrastructure and cloud deployment playbook
 
 Delivered on branch `feature/staging-deploy-infra`: a production-oriented
 deployment bundle under `deploy/` that composes the bot behind Nginx with

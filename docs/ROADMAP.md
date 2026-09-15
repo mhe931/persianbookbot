@@ -311,9 +311,42 @@ Still open for a follow-up live-validation iteration:
   `docs/BENCHMARK_RESULTS.md` recommendations for what to expect from
   each).
 
+## Milestone 8 — Production-readiness audit ✅ (verified; live infra still unavailable)
+
+Delivered on branch `feature/production-readiness-audit`: a full
+source-anchored, read-only audit of every prior milestone below, producing
+`docs/PRODUCTION_READINESS.md` and refreshing README.md/AGENTS.md/
+`docs/PROJECT_STATUS.md`/this roadmap. **No application code changed.**
+
+- ✅ Architecture, interfaces/dependencies, and security/credential-
+  handling review across `src/`, `web/`, `tools/`, `deploy/`, the root
+  `Dockerfile`/`docker-compose.yml`, and `.github/` — no defect found.
+- ✅ Static behavioral audit of RTL/BiDi handling, converter font hooks,
+  OCR error mapping, polling/webhook exclusivity, webhook secret
+  validation, health/cleanup behavior, Mini App configuration/lifecycle/
+  upload handling, and Docker/Compose/Nginx/bootstrap coherence — all
+  confirmed correct against the current source (see
+  `docs/PRODUCTION_READINESS.md` for the full per-item evidence trail).
+- ✅ `pytest tests/` re-verified: **157 passed, 0 failed**, fully offline,
+  zero credentials — the exact same count as Milestone 7, since no test
+  was added or removed by this audit.
+- ✅ Git/secret hygiene re-verified: `.env` git-ignored and untracked; no
+  committed secrets, keys, certificates, PDFs, or generated runtime
+  artifacts anywhere in tracked history.
+- **Still not live-validated** (same environment constraints as
+  Milestones 4–7, restated rather than newly discovered): no Docker
+  engine, no VPS/DNS record, no TLS issuance, and no real Telegram/OCR-
+  provider credential were available, so the Docker image was still never
+  built/run, `deploy/docker-compose.prod.yml` was still never brought up
+  against a real domain, and no live webhook/real-OCR call was made. See
+  `docs/PRODUCTION_READINESS.md`'s "Known operational constraints" for the
+  consolidated, prioritized follow-up list — unchanged from Milestone 7's
+  own open items below, since no new infrastructure became available
+  between milestones.
+
 ## Prioritization notes
 
-With Milestones 3, 4, 6, and 7 delivered and Milestone 5
+With Milestones 3, 4, 6, 7, and 8 delivered and Milestone 5
 attempted-but-blocked on environment availability, the highest-value next
 step is unchanged from before this milestone: **get access to a real
 VPS/cloud host with a Docker engine, a DNS record under your control, and
@@ -321,9 +354,11 @@ a real Telegram bot token**, and run the full `docs/DEPLOYMENT_GUIDE.md`
 walkthrough end-to-end — container smoke test, TLS issuance, and live
 webhook registration/delivery all in one pass, since they all depend on
 the same missing prerequisite (see Milestone 5, Milestone 6, and
-Milestone 7 above for the detailed follow-up lists) — everything else
-(converters, job orchestration, delivery surfaces including webhook mode,
-CI, logging, retention, containerization, cleanup scheduling, benchmark
-tooling/reporting/CSV export, and the Nginx/Certbot deployment bundle
-itself) is already implemented and tested end-to-end.
+Milestone 7 above for the detailed follow-up lists, and
+`docs/PRODUCTION_READINESS.md` for the consolidated, audited version of
+the same list) — everything else (converters, job orchestration, delivery
+surfaces including webhook mode, CI, logging, retention, containerization,
+cleanup scheduling, benchmark tooling/reporting/CSV export, and the
+Nginx/Certbot deployment bundle itself) is already implemented, tested,
+and now independently audited end-to-end.
 
